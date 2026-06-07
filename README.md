@@ -24,7 +24,7 @@ Many countries, including Germany, offer residential customers the option to sel
 
 ```
 
-Here, MILP stands for **Mixed-Integer Linear Programming**, which is a powerful optimization technique that can handle both continuous and discrete decision variables, making it suitable for modeling the EMS problem with its various constraints and objectives.
+This project mainly focuses on the **optimization module**, along with exploring different forecasting and scenario generation techniques. Here, MILP stands for **Mixed-Integer Linear Programming**, which is a powerful optimization technique that can handle both continuous and discrete decision variables, making it suitable for modeling the EMS problem with its various constraints and objectives.
 
 ## Project Objective
 
@@ -32,7 +32,7 @@ The objective of the project is to apply **deterministic optimization** and **sc
 
 - ingesting and preprocessing historical data on load, PV generation from open source datasets [[1](https://doi.org/10.5281/zenodo.14918474), [2](https://doi.org/10.1038/s41597-022-01156-1)], and energy prices from SMARD
 - comparing different optimization solvers (e.g., GLPK, SCIP) and using them via Pyomo
-- implementing a two-stage stochastic MILP to optimize the battery schedule and grid exchange
+- implementing a two-stage stochastic optimization to optimize the battery schedule and grid exchange
 - evaluating the performance of two-stage stochastic optimization against perfect foresight optimization
 - implementing and comparing various machine learning techniques for forecasting and scenario generation
 

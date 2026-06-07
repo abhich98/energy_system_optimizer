@@ -23,6 +23,7 @@ class Battery(BaseModel):
         initial_soc: Initial state of charge in kWh
         min_soc: Minimum allowed state of charge in kWh (defaults to 0 kWh)
         max_soc: Maximum allowed state of charge in kWh (defaults to capacity)
+        degradation_cost: Cost per kWh of battery throughput to account for degradation (EUR/kWh)
     """
 
     id: str = Field(..., description="Unique battery identifier")
@@ -43,6 +44,9 @@ class Battery(BaseModel):
     )
     max_soc: Optional[float] = Field(
         default=None, ge=0, description="Maximum allowed state of charge (kWh)"
+    )
+    degradation_cost: float = Field(
+        ..., ge=0, description="Cost per kWh of battery throughput to account for degradation (EUR/kWh)"
     )
 
     @field_validator("max_soc")
@@ -68,6 +72,15 @@ class Battery(BaseModel):
                 f"between min_soc ({self.min_soc}) and max_soc ({self.max_soc})"
             )
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_degradation_cost(self):
+        """Validate degradation cost."""
+        if self.degradation_cost < 0:
+            raise ValueError(
+                f"Battery {self.id}: degradation_cost must be non-negative"
+            )
         return self
 
     @property

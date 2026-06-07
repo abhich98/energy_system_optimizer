@@ -26,18 +26,18 @@ class BaseEnergyOptimizer(ABC):
         batteries,
         load_forecast,
         pv_forecast,
-        price_forecast,
+        import_price_forecast,
         export_price_forecast: Optional[Sequence[float]] = None,
         timestep_hours: float = 1.0,
     ):
         self.batteries = batteries
         self.load_forecast = np.array(load_forecast)
         self.pv_forecast = np.array(pv_forecast)
-        self.price_forecast = np.array(price_forecast)
+        self.import_price_forecast = np.array(import_price_forecast)
         self.export_price_forecast = (
             np.array(export_price_forecast)
             if export_price_forecast is not None
-            else np.zeros_like(price_forecast)
+            else np.zeros_like(import_price_forecast)
         )
         self.timestep_hours = timestep_hours
 
@@ -55,8 +55,8 @@ class BaseEnergyOptimizer(ABC):
         if len(self.pv_forecast) != n_timesteps:
             raise ValueError("pv_forecast must have same length as load_forecast")
 
-        if len(self.price_forecast) != n_timesteps:
-            raise ValueError("price_forecast must have same length as load_forecast")
+        if len(self.import_price_forecast) != n_timesteps:
+            raise ValueError("import_price_forecast must have same length as load_forecast")
 
         if len(self.export_price_forecast) != n_timesteps:
             raise ValueError(
@@ -155,13 +155,13 @@ class BaseEnergyOptimizer(ABC):
         if results is None:
             raise ValueError("No results available. Run solve() first.")
 
-        n_timesteps = len(self.price_forecast)
+        n_timesteps = len(self.import_price_forecast)
 
         data: Dict[str, Any] = {
             "timestep": range(n_timesteps),
             "pv": self.pv_forecast,
             "load": self.load_forecast,
-            "price": self.price_forecast,
+            "import_price": self.import_price_forecast,
             "export_price": self.export_price_forecast,
             "grid_import": results["grid_import"],
             "grid_export": results["grid_export"],
