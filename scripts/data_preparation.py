@@ -125,13 +125,15 @@ def build_dataset(config: dict[str, Any], config_path: Path) -> pd.DataFrame:
 		config["columns"]["price_time"],
 		config["columns"]["price_mwh"],
 	)
-	prices["Energy price (EUR/kWh)"] += config["prices_fixed_comp_euro_kwh"]
-	prices["Energy price (EUR/kWh)"].clip(lower=0.0, inplace=True) # Ensure no negative prices after adding the fixed component
-	prices["Energy price (EUR/MWh)"] = prices["Energy price (EUR/kWh)"] * 1000.0
 
 	dataset = pd.DataFrame({"Date": time_series})
 	logger.info(f"dataset shape after initialization: {dataset.shape}")
+
 	dataset = dataset.merge(prices, on="Date", how="left", validate="one_to_one")
+	dataset["Energy price (EUR/kWh)"] = dataset["Energy price (EUR/kWh)"].ffill()
+	dataset["Energy price (EUR/kWh)"] += config["prices_fixed_comp_euro_kwh"]
+	dataset["Energy price (EUR/kWh)"] = dataset["Energy price (EUR/kWh)"].clip(lower=0.0) # Ensure no negative prices after adding the fixed component
+	dataset["Energy price (EUR/MWh)"] = dataset["Energy price (EUR/kWh)"] * 1000.0
 
 	# PV and load data come from 2019, so we merge them with the dataset after merging the prices to preserve the price data for the target year (2025)
 	year_diff = year - pv["Date"].dt.year.iloc[0]

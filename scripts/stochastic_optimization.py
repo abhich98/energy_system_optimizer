@@ -21,7 +21,8 @@ import wandb
 from esms.eval import OptimizationCostCalculator
 from esms.optimization import StochasticEnergyOptimizer
 from esms.utils import get_available_pyomo_solvers
-from perfect_foresight_optimization import build_batteries 
+from perfect_foresight_optimization import build_batteries
+ 
 
 logging.basicConfig(
     level=logging.INFO,
@@ -169,7 +170,7 @@ def _solve_single_day(
     return expected_df, scenario_df
 
 
-def _init_wandb(config: dict[str, Any]):
+def init_wandb(config: dict[str, Any]):
     wandb_cfg = config.get("wandb", {})
     if not wandb_cfg.get("enabled", True):
         return None
@@ -180,6 +181,7 @@ def _init_wandb(config: dict[str, Any]):
         name=wandb_cfg.get("run_name"),
         tags=wandb_cfg.get("tags", ["stochastic"]),
         config=config,
+        settings=wandb.Settings(_disable_stats=True),
     )
 
 
@@ -217,6 +219,11 @@ def main() -> None:
         help="Number of scenarios to generate per day",
     )
     parser.add_argument(
+        "--wandb_track",
+        action="store_true",
+        help="Whether to track runs with Weights & Biases (wandb)",
+    )
+    parser.add_argument(
         "--scenario_output_file",
         type=str,
         default=None,
@@ -232,7 +239,6 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-
     config = load_config(args.config_file)
 
     # CLI args override config file values
@@ -242,6 +248,8 @@ def main() -> None:
 
     year = config["year"] = args.year
     num_scenarios = config["num_scenarios"] = args.num_scenarios
+    config["wandb"]["enabled"] = args.wandb_track
+
     if args.scenario_output_file is not None:
         config["save_scenario_results"] = True
     else:
@@ -298,6 +306,8 @@ def main() -> None:
         "Date"
     ].date()
 
+    wandb_run = init_wandb(config)
+
     logger.info("=" * 60)
     logger.info("EsMS Stochastic Optimization (Rolling History Scenarios)")
     logger.info("Date range: %s to %s", start_date, end_date)
@@ -306,8 +316,6 @@ def main() -> None:
     logger.info("Resolution: %s h (%s points/day)", timestep_hours, time_points_per_day)
     logger.info("Solver: %s", solver_to_use)
     logger.info("=" * 60)
-
-    wandb_run = _init_wandb(config)
 
     start_time = datetime.datetime.now()
     day_outputs = Parallel(n_jobs=n_jobs)(
@@ -368,11 +376,8 @@ def main() -> None:
                 "final_cost/import": cost_breakdown.import_cost,
                 "final_cost/export_revenue": cost_breakdown.export_revenue,
                 "final_cost/degradation": cost_breakdown.degradation_cost,
+
                 "run/elapsed_seconds": elapsed_time.total_seconds(),
-                "run/output_expected_rows": len(expected_results_df),
-                "run/output_scenario_rows": len(scenario_results_df)
-                if scenario_results_df is not None
-                else 0,
             }
         )
         wandb_run.finish()

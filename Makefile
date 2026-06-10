@@ -12,6 +12,14 @@ SCRIPTS_DIR := ./scripts
 PYTHON := .venv/bin/python
 STOC_OP_SCENARIOS := 3
 
+WANDB_TRACKING := false
+
+ifeq ($(WANDB_TRACKING),true)
+    WANDB_FLAG := --wandb_track
+else
+    WANDB_FLAG :=
+endif
+
 export
 
 .PHONY: app all
@@ -29,7 +37,7 @@ $(GENERATED_DATA_DIR)/perfect_foresight_optimization_$(YEAR).csv: $(SCRIPTS_DIR)
 	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --battery_file $(BESS_FILE) --year $(YEAR) --start_day_index 0 --num_days 365 --output_file $@
 
 $(GENERATED_DATA_DIR)/stochastic_policy_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv: $(SCRIPTS_DIR)/stochastic_optimization.py $(GROUND_TRUTH_FILE) $(STOCHASTIC_OPTIMIZATION_CONFIG_FILE) $(BESS_FILE)
-	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --battery_file $(BESS_FILE) --config_file $(STOCHASTIC_OPTIMIZATION_CONFIG_FILE) --year $(YEAR) --num_scenarios $(STOC_OP_SCENARIOS) --scenario_output_file $(GENERATED_DATA_DIR)/stochastic_scenario_results_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv --output_file $@
+	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --battery_file $(BESS_FILE) --config_file $(STOCHASTIC_OPTIMIZATION_CONFIG_FILE) --year $(YEAR) --num_scenarios $(STOC_OP_SCENARIOS) $(WANDB_FLAG) --scenario_output_file $(GENERATED_DATA_DIR)/stochastic_scenario_results_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv --output_file $@
 
 $(GENERATED_DATA_DIR)/stochastic_policy_with_$(STOC_OP_SCENARIOS)_scenarios_evaluation_$(YEAR).csv: $(SCRIPTS_DIR)/stochastic_policy_evaluation.py $(GROUND_TRUTH_FILE) $(BESS_FILE) $(GENERATED_DATA_DIR)/stochastic_policy_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv
-	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --battery_file $(BESS_FILE) --policy_file $(GENERATED_DATA_DIR)/stochastic_policy_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv --start_day_index 0 --output_file $@
+	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --battery_file $(BESS_FILE) --policy_file $(GENERATED_DATA_DIR)/stochastic_policy_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv --start_day_index 0 $(WANDB_FLAG) --output_file $@
