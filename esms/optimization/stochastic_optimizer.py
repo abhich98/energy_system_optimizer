@@ -580,6 +580,8 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
         model = self.model
 
         # First-stage decision (Ahead market)
+        import_price_ahead = [value(model.ImportPriceAhead[t]) for t in model.T]
+        export_price_ahead = [value(model.ExportPriceAhead[t]) for t in model.T]
         grid_import_ahead = [value(model.grid_import_ahead[t]) for t in model.T]
         grid_export_ahead = [value(model.grid_export_ahead[t]) for t in model.T]
         battery_ahead = {
@@ -615,6 +617,8 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
                 }
                 battery_schedules.append(schedule)
 
+            import_price_rt = [value(model.ImportPriceRT[s, t]) for t in model.T]
+            export_price_rt = [value(model.ExportPriceRT[s, t]) for t in model.T]
             grid_import_rt = [value(model.grid_import_rt[s, t]) for t in model.T]
             grid_export_rt = [value(model.grid_export_rt[s, t]) for t in model.T]
 
@@ -623,8 +627,13 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
                     "scenario": s,
                     "probability": self.scenario_probabilities[s],
                     "batteries": battery_schedules,
+                    "import_price_ahead": import_price_ahead,
+                    "export_price_ahead": export_price_ahead,
                     "grid_import_ahead": grid_import_ahead,
                     "grid_export_ahead": grid_export_ahead,
+
+                    "import_price_rt": import_price_rt,
+                    "export_price_rt": export_price_rt,
                     "grid_import_rt": grid_import_rt,
                     "grid_export_rt": grid_export_rt,
                     "grid_import": (
@@ -637,6 +646,8 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
             )
 
         # Compute expected (probability-weighted) second-stage variables
+        expected_import_price_rt = np.zeros(self.n_timesteps)
+        expected_export_price_rt = np.zeros(self.n_timesteps)
         expected_grid_import_rt = np.zeros(self.n_timesteps)
         expected_grid_export_rt = np.zeros(self.n_timesteps)
         expected_batteries = []
@@ -675,6 +686,12 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
 
         for s in model.S:
             prob = self.scenario_probabilities[s]
+            expected_import_price_rt += prob * np.array(
+                [value(model.ImportPriceRT[s, t]) for t in model.T]
+            )
+            expected_export_price_rt += prob * np.array(
+                [value(model.ExportPriceRT[s, t]) for t in model.T]
+            )
             expected_grid_import_rt += prob * np.array(
                 [value(model.grid_import_rt[s, t]) for t in model.T]
             )
@@ -688,17 +705,22 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
         results = {
             "scenarios": scenario_results,  # All scenario results
             "batteries": expected_batteries,  # Expected battery schedules
-            "price_ahead": self.import_price_ahead.tolist(),
-            "grid_export": (
-                np.array(grid_export_ahead) + expected_grid_export_rt
-            ).tolist(),
+            "import_price_ahead": import_price_ahead,
+            "export_price_ahead": export_price_ahead,
             "grid_import": (
                 np.array(grid_import_ahead) + expected_grid_import_rt
             ).tolist(),
+            "grid_export": (
+                np.array(grid_export_ahead) + expected_grid_export_rt
+            ).tolist(),
             "grid_import_ahead": grid_import_ahead,  # First-stage decision
             "grid_export_ahead": grid_export_ahead,
+
+            "expected_import_price_rt": expected_import_price_rt.tolist(),
+            "expected_export_price_rt": expected_export_price_rt.tolist(),
             "expected_grid_import_rt": expected_grid_import_rt.tolist(),
             "expected_grid_export_rt": expected_grid_export_rt.tolist(),
+
             "total_cost": total_cost,
             "solver_status": str(self.results.solver.termination_condition),
             "objective_value": total_cost,
@@ -725,11 +747,15 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
 
         data: Dict[str, Any] = {
             "timestep": range(n_timesteps),
-            "price_ahead": results["price_ahead"],
+            "import_price_ahead": results["import_price_ahead"],
+            "export_price_ahead": results["export_price_ahead"],
             "grid_import": results["grid_import"],
             "grid_export": results["grid_export"],
             "grid_import_ahead": results["grid_import_ahead"],
             "grid_export_ahead": results["grid_export_ahead"],
+
+            "expected_import_price_rt": results["expected_import_price_rt"],
+            "expected_export_price_rt": results["expected_export_price_rt"],
             "expected_grid_import_rt": results["expected_grid_import_rt"],
             "expected_grid_export_rt": results["expected_grid_export_rt"],
         }
@@ -771,12 +797,17 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
             df = pd.DataFrame(
                 {
                     "timestep": range(n_timesteps),
-                    "grid_import_ahead": scenario_result["grid_import_ahead"],
-                    "grid_export_ahead": scenario_result["grid_export_ahead"],
                     "grid_import": scenario_result["grid_import"],
                     "grid_export": scenario_result["grid_export"],
+                    "grid_import_ahead": scenario_result["grid_import_ahead"],
+                    "grid_export_ahead": scenario_result["grid_export_ahead"],
                     "grid_import_rt": scenario_result["grid_import_rt"],
                     "grid_export_rt": scenario_result["grid_export_rt"],
+
+                    "import_price_ahead": scenario_result["import_price_ahead"],
+                    "export_price_ahead": scenario_result["export_price_ahead"],
+                    "import_price_rt": scenario_result["import_price_rt"],
+                    "export_price_rt": scenario_result["export_price_rt"],
                 }
             )
             for b in scenario_result["batteries"]:

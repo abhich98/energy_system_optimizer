@@ -23,7 +23,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("Perfect Foresight Optim.")
 
 
 def build_batteries(battery_specs: List[Dict[str, Any]]) -> List[Battery]:
@@ -35,6 +35,7 @@ def solve_day_deterministic(
     day_df: pd.DataFrame,
     battery_specs: List[Dict[str, Any]],
     solver: str = "scip",
+    timestep_hours: float = 1.0,
 ) -> pd.DataFrame:
     """Optimize a single day with deterministic approach.
 
@@ -48,7 +49,7 @@ def solve_day_deterministic(
     """
     pv_forecast = day_df["PV generation (kW)"].to_numpy(dtype=float)
     load_forecast = day_df["Consumption (kW)"].to_numpy(dtype=float)
-    price_forecast = day_df["Energy price (EUR/kWh)"].to_numpy(dtype=float)
+    import_price_forecast = day_df["Energy price (EUR/kWh)"].to_numpy(dtype=float)
 
     solver_args = {}
     if solver == "scip":
@@ -58,8 +59,8 @@ def solve_day_deterministic(
         batteries=build_batteries(battery_specs),
         load_forecast=load_forecast,
         pv_forecast=pv_forecast,
-        price_forecast=price_forecast,
-        timestep_hours=1.0,
+        import_price_forecast=import_price_forecast,
+        timestep_hours=timestep_hours,
     )
 
     results = optimizer.solve(solver_name=solver, verbose=False, **solver_args)
@@ -87,6 +88,13 @@ def main():
         type=str,
         required=True,
         help="Path to the battery configuration JSON file",
+    )
+    parser.add_argument(
+        "--year",
+        type=int,
+        default=2025,
+        required=False,
+        help="Dataset year to use for analysis",
     )
     parser.add_argument(
         "--start_day_index",
@@ -121,7 +129,7 @@ def main():
     # Load dataset
     logger.info("Loading dataset from %s", args.data_file)
     data_df = pd.read_excel(
-        args.data_file, sheet_name="2023 data", usecols="A:F", nrows=8762
+        args.data_file, sheet_name=f"{args.year} data", usecols="A:F"
     )
 
     # Load battery specs
@@ -139,9 +147,16 @@ def main():
         )
         solver_to_use = "glpk"
 
+    time_series = pd.Series(pd.to_datetime(data_df["Date"].unique())).sort_values(
+        ignore_index=True
+    )
+    time_series_diff_hours = time_series.diff().dt.total_seconds() / 3600.0
+    time_res_hrs = time_series_diff_hours.mode()[0]
+    time_points_per_day = int(24 / time_res_hrs)
+
     # Get date range
-    start_date = data_df.iloc[day_idx * 24]["Date"].date()
-    end_date = data_df.iloc[(day_idx + num_days - 1) * 24 + 23]["Date"].date()
+    start_date = data_df.iloc[day_idx * time_points_per_day]["Date"].date()
+    end_date = data_df.iloc[(day_idx + num_days) * time_points_per_day - 1]["Date"].date()
 
     logger.info("=" * 60)
     logger.info("EsMS Energy Optimizer - Deterministic Optimization (Parallel)")
@@ -159,10 +174,11 @@ def main():
         day_results = Parallel(n_jobs=-1)(
             delayed(solve_day_deterministic)(
                 day_df=data_df.iloc[
-                    day_idx * 24 + i * 24 : day_idx * 24 + (i + 1) * 24
+                    day_idx * time_points_per_day + i * time_points_per_day : day_idx * time_points_per_day + (i + 1) * time_points_per_day
                 ],
                 battery_specs=deepcopy(def_battery_specs),
                 solver=solver_to_use,
+                timestep_hours=time_res_hrs,
             )
             for i in range(num_days)
         )
@@ -178,7 +194,7 @@ def main():
         logger.info("OPTIMIZATION COMPLETED")
         logger.info("=" * 60)
         logger.info(f"Optimization completed in {elapsed_time}")
-        logger.info(f"Generated output has {len(results_df) // 24} days")
+        logger.info(f"Generated output has {len(results_df) // time_points_per_day} days")
 
         # Save results
         results_df.to_csv(args.output_file)

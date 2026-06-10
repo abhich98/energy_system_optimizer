@@ -1,0 +1,20 @@
+start_day_index: 60
+num_days: 3
+history_days: 60
+
+pv_coeff: 0.3
+load_coeff: 0.7
+random_state: 3
+n_jobs: -1
+
+solver: scip
+
+wandb:
+  enabled: false
+  project: esms-stochastic-optimization
+  entity:
+  run_name:
+  tags:
+    - stochastic
+    - scenario-based
+    - kmedoids

@@ -65,7 +65,13 @@ class EnergyOptimizer(BaseEnergyOptimizer):
             timestep_hours=timestep_hours,
         )
 
-    def build_model(self) -> ConcreteModel:
+    def build_model(
+            self, 
+            grid_import_values=None,
+            grid_export_values=None,
+            charge_values=None,
+            discharge_values=None,
+        ) -> ConcreteModel:
         """
         Build the Pyomo optimization model.
 
@@ -159,6 +165,21 @@ class EnergyOptimizer(BaseEnergyOptimizer):
         model.grid_export = Var(
             model.T, domain=NonNegativeReals, doc="Grid export power (kW)"
         )
+        # Fix variables if values are provided (for warm-starting or policy evaluation)
+        if grid_import_values is not None:
+            for t in model.T:
+                model.grid_import[t].fix(grid_import_values[t])
+        if grid_export_values is not None:
+            for t in model.T:
+                model.grid_export[t].fix(grid_export_values[t])
+        if charge_values is not None:
+            for b in model.B:
+                for t in model.T:
+                    model.charge[b, t].fix(charge_values[b][t])
+        if discharge_values is not None:
+            for b in model.B:
+                for t in model.T:
+                    model.discharge[b, t].fix(discharge_values[b][t])
 
         # Binary variable for charge/discharge state (MILP constraint)
         model.u = Var(
