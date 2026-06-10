@@ -8,17 +8,16 @@ used in the optimization.
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 BATTERY_UNITS = {
-	"capacity": "kWh",
-	"max_charge": "kW",
-	"max_discharge": "kW",
-	"charge_efficiency": [0, 1],
-	"discharge_efficiency": [0, 1],
-	"initial_soc": "kWh",
-	"min_soc": "kWh",
-	"max_soc": "kWh",
-	"degradation_cost": "EUR/kWh",
+    "capacity": "kWh",
+    "max_charge": "kW",
+    "max_discharge": "kW",
+    "charge_efficiency": [0, 1],
+    "discharge_efficiency": [0, 1],
+    "initial_soc": "kWh",
+    "min_soc": "kWh",
+    "max_soc": "kWh",
+    "degradation_cost": "EUR/kWh",
 }
 
 
@@ -59,7 +58,9 @@ class Battery(BaseModel):
         default=None, ge=0, description="Maximum allowed state of charge (kWh)"
     )
     degradation_cost: float = Field(
-        ..., ge=0, description="Cost per kWh of battery throughput to account for degradation (EUR/kWh)"
+        ...,
+        ge=0,
+        description="Cost per kWh of battery throughput to account for degradation (EUR/kWh)",
     )
 
     @field_validator("max_soc")

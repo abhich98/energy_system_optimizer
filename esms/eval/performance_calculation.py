@@ -90,7 +90,9 @@ class DeterministicPerformanceCalculator:
                 battery_ids.append(candidate)
         return sorted(set(battery_ids))
 
-    def calculate_from_dataframe(self, results_df: pd.DataFrame) -> PerformanceBreakdown:
+    def calculate_from_dataframe(
+        self, results_df: pd.DataFrame
+    ) -> PerformanceBreakdown:
         required_cols = {"pv", "load", "grid_import", "grid_export"}
         missing = [c for c in required_cols if c not in results_df.columns]
         if missing:
@@ -102,8 +104,12 @@ class DeterministicPerformanceCalculator:
 
         pv = pd.to_numeric(results_df["pv"], errors="coerce").fillna(0.0)
         load = pd.to_numeric(results_df["load"], errors="coerce").fillna(0.0)
-        grid_import = pd.to_numeric(results_df["grid_import"], errors="coerce").fillna(0.0)
-        grid_export = pd.to_numeric(results_df["grid_export"], errors="coerce").fillna(0.0)
+        grid_import = pd.to_numeric(results_df["grid_import"], errors="coerce").fillna(
+            0.0
+        )
+        grid_export = pd.to_numeric(results_df["grid_export"], errors="coerce").fillna(
+            0.0
+        )
 
         total_pv_generation_kwh = float(pv.sum() * self.dt_hours)
         total_load_kwh = float(load.sum() * self.dt_hours)
@@ -147,8 +153,8 @@ class DeterministicPerformanceCalculator:
                 soc = pd.to_numeric(results_df[soc_col], errors="coerce").fillna(0.0)
                 observed_usable_kwh = float((soc.max() - soc.min()))
                 if observed_usable_kwh > 0:
-                    estimated_equivalent_cycles += (
-                        (charge_kwh + discharge_kwh) / (2.0 * observed_usable_kwh)
+                    estimated_equivalent_cycles += (charge_kwh + discharge_kwh) / (
+                        2.0 * observed_usable_kwh
                     )
                 else:
                     warnings.append(
@@ -163,11 +169,18 @@ class DeterministicPerformanceCalculator:
 
         total_charge_power = np.zeros(len(results_df), dtype=float)
         for battery_id in battery_ids:
-            total_charge_power += pd.to_numeric(
-                results_df[f"{battery_id}_charge"], errors="coerce"
-            ).fillna(0.0).to_numpy(dtype=float)
+            total_charge_power += (
+                pd.to_numeric(results_df[f"{battery_id}_charge"], errors="coerce")
+                .fillna(0.0)
+                .to_numpy(dtype=float)
+            )
 
-        pv_spillage_power = (pv.to_numpy(dtype=float) - load.to_numpy(dtype=float) - total_charge_power - grid_export.to_numpy(dtype=float)).clip(min=0.0)
+        pv_spillage_power = (
+            pv.to_numpy(dtype=float)
+            - load.to_numpy(dtype=float)
+            - total_charge_power
+            - grid_export.to_numpy(dtype=float)
+        ).clip(min=0.0)
         pv_spillage_kwh = float(np.sum(pv_spillage_power) * self.dt_hours)
 
         peak_grid_import_kw = float(grid_import.max())
@@ -212,7 +225,9 @@ class DeterministicPerformanceCalculator:
             warnings=warnings,
         )
 
-    def calculate_from_file(self, optimization_result_file: str | Path) -> PerformanceBreakdown:
+    def calculate_from_file(
+        self, optimization_result_file: str | Path
+    ) -> PerformanceBreakdown:
         df = pd.read_csv(optimization_result_file)
         return self.calculate_from_dataframe(df)
 

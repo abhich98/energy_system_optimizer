@@ -66,12 +66,12 @@ class EnergyOptimizer(BaseEnergyOptimizer):
         )
 
     def build_model(
-            self, 
-            grid_import_values=None,
-            grid_export_values=None,
-            charge_values=None,
-            discharge_values=None,
-        ) -> ConcreteModel:
+        self,
+        grid_import_values=None,
+        grid_export_values=None,
+        charge_values=None,
+        discharge_values=None,
+    ) -> ConcreteModel:
         """
         Build the Pyomo optimization model.
 
@@ -204,7 +204,8 @@ class EnergyOptimizer(BaseEnergyOptimizer):
                 )
                 * model.dt
                 + sum(
-                    model.DegCost[b] * (model.charge[b, t] + model.discharge[b, t])
+                    model.DegCost[b]
+                    * (model.charge[b, t] + model.discharge[b, t])
                     * model.dt
                     for b in model.B
                 )

@@ -8,7 +8,6 @@ import pandas as pd
 from esms.api.schemas import SolverConfig
 from esms.models import Battery
 
-
 FORECASTS_CSV_REQUIRED_COLUMNS = ["pv", "load", "price"]
 
 

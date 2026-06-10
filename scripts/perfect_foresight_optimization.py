@@ -156,7 +156,9 @@ def main():
 
     # Get date range
     start_date = data_df.iloc[day_idx * time_points_per_day]["Date"].date()
-    end_date = data_df.iloc[(day_idx + num_days) * time_points_per_day - 1]["Date"].date()
+    end_date = data_df.iloc[(day_idx + num_days) * time_points_per_day - 1][
+        "Date"
+    ].date()
 
     logger.info("=" * 60)
     logger.info("EsMS Energy Optimizer - Deterministic Optimization (Parallel)")
@@ -174,7 +176,9 @@ def main():
         day_results = Parallel(n_jobs=-1)(
             delayed(solve_day_deterministic)(
                 day_df=data_df.iloc[
-                    day_idx * time_points_per_day + i * time_points_per_day : day_idx * time_points_per_day + (i + 1) * time_points_per_day
+                    day_idx * time_points_per_day
+                    + i * time_points_per_day : day_idx * time_points_per_day
+                    + (i + 1) * time_points_per_day
                 ],
                 battery_specs=deepcopy(def_battery_specs),
                 solver=solver_to_use,
@@ -194,7 +198,9 @@ def main():
         logger.info("OPTIMIZATION COMPLETED")
         logger.info("=" * 60)
         logger.info(f"Optimization completed in {elapsed_time}")
-        logger.info(f"Generated output has {len(results_df) // time_points_per_day} days")
+        logger.info(
+            f"Generated output has {len(results_df) // time_points_per_day} days"
+        )
 
         # Save results
         results_df.to_csv(args.output_file)

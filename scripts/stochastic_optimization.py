@@ -22,7 +22,6 @@ from esms.eval import OptimizationCostCalculator
 from esms.optimization import StochasticEnergyOptimizer
 from esms.utils import get_available_pyomo_solvers
 from perfect_foresight_optimization import build_batteries
- 
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,9 +63,8 @@ def generate_daily_scenarios(
 
     pv_distances = manhattan_distances(pv_hist)
     load_distances = manhattan_distances(load_hist)
-    hist_distance = (
-        pv_coeff * _normalized(pv_distances)
-        + load_coeff * _normalized(load_distances)
+    hist_distance = pv_coeff * _normalized(pv_distances) + load_coeff * _normalized(
+        load_distances
     )
 
     model = kmedoids.KMedoids(
@@ -144,8 +142,12 @@ def _solve_single_day(
     stochastic_optimizer.build_model(
         grid_import_ahead_values=np.zeros(time_points_per_day),
         grid_export_ahead_values=np.zeros(time_points_per_day),
-        charge_realtime_values=np.zeros((len(battery_specs), num_scenarios, time_points_per_day)),
-        discharge_realtime_values=np.zeros((len(battery_specs), num_scenarios, time_points_per_day))
+        charge_realtime_values=np.zeros(
+            (len(battery_specs), num_scenarios, time_points_per_day)
+        ),
+        discharge_realtime_values=np.zeros(
+            (len(battery_specs), num_scenarios, time_points_per_day)
+        ),
     )
 
     stochastic_results = stochastic_optimizer.solve(
@@ -160,10 +162,12 @@ def _solve_single_day(
 
     scenario_df: pd.DataFrame | None = None
     if save_scenario_results:
-        scenario_df = stochastic_optimizer.scenario_results_to_dataframe(stochastic_results)
+        scenario_df = stochastic_optimizer.scenario_results_to_dataframe(
+            stochastic_results
+        )
         day_dates = pd.to_datetime(day_df["Date"].to_numpy())
-        scenario_df["Date"] = scenario_df["timestep"].astype(int).map(
-            dict(enumerate(day_dates))
+        scenario_df["Date"] = (
+            scenario_df["timestep"].astype(int).map(dict(enumerate(day_dates)))
         )
         scenario_df.index.name = "Date"
 
@@ -194,7 +198,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--config_file",
-        type=str, 
+        type=str,
         required=True,
         help="Path to YAML configuration file.",
     )
@@ -376,7 +380,6 @@ def main() -> None:
                 "final_cost/import": cost_breakdown.import_cost,
                 "final_cost/export_revenue": cost_breakdown.export_revenue,
                 "final_cost/degradation": cost_breakdown.degradation_cost,
-
                 "run/elapsed_seconds": elapsed_time.total_seconds(),
             }
         )

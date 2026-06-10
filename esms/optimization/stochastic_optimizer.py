@@ -76,7 +76,11 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
 
         # Day-ahead prices (known, scenario-independent)
         self.import_price_ahead = np.array(import_price_ahead)
-        self.export_price_ahead = np.array(export_price_ahead) if export_price_ahead is not None else np.zeros_like(self.import_price_ahead)
+        self.export_price_ahead = (
+            np.array(export_price_ahead)
+            if export_price_ahead is not None
+            else np.zeros_like(self.import_price_ahead)
+        )
 
         if import_price_rt_scenarios is None:
             self.import_price_rt_scenarios = np.ones_like(self.load_scenarios) * np.max(
@@ -144,7 +148,7 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
         )
 
     def build_model(
-        self, 
+        self,
         grid_import_ahead_values: Optional[np.ndarray] = None,
         grid_export_ahead_values: Optional[np.ndarray] = None,
         battery_charge_ahead_values: Optional[np.ndarray] = None,
@@ -317,7 +321,9 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
         if battery_discharge_ahead_values is not None:
             for b in model.B:
                 for t in model.T:
-                    model.discharge_ahead[b, t].fix(battery_discharge_ahead_values[b, t])
+                    model.discharge_ahead[b, t].fix(
+                        battery_discharge_ahead_values[b, t]
+                    )
 
         # Second-stage decisions (scenario-dependent)
         model.grid_import_rt = Var(
@@ -388,12 +394,16 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
             for b in model.B:
                 for s in model.S:
                     for t in model.T:
-                        model.charge_realtime[b, s, t].fix(charge_realtime_values[b, s, t])
+                        model.charge_realtime[b, s, t].fix(
+                            charge_realtime_values[b, s, t]
+                        )
         if discharge_realtime_values is not None:
             for b in model.B:
                 for s in model.S:
                     for t in model.T:
-                        model.discharge_realtime[b, s, t].fix(discharge_realtime_values[b, s, t])
+                        model.discharge_realtime[b, s, t].fix(
+                            discharge_realtime_values[b, s, t]
+                        )
 
         # =================================================================
         # OBJECTIVE FUNCTION
@@ -446,8 +456,14 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
 
         # (A) Power Balance - for each scenario and timestep
         def power_balance_rule(model, s, t):
-            total_discharge = sum(model.discharge_ahead[b, t] + model.discharge_realtime[b, s, t] for b in model.B)
-            total_charge = sum(model.charge_ahead[b, t] + model.charge_realtime[b, s, t] for b in model.B)
+            total_discharge = sum(
+                model.discharge_ahead[b, t] + model.discharge_realtime[b, s, t]
+                for b in model.B
+            )
+            total_charge = sum(
+                model.charge_ahead[b, t] + model.charge_realtime[b, s, t]
+                for b in model.B
+            )
 
             return (
                 model.grid_import_ahead[t]
@@ -553,9 +569,8 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
         )
 
         def grid_export_rule(model, s, t):
-            return (
-                model.grid_export_ahead[t] + model.grid_export_rt[s, t]
-                <= 1e6 * (1 - model.v[s, t])
+            return model.grid_export_ahead[t] + model.grid_export_rt[s, t] <= 1e6 * (
+                1 - model.v[s, t]
             )
 
         model.grid_export_limit = Constraint(
@@ -598,7 +613,9 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
             battery_schedules = []
             for b in model.B:
                 charge_rt = [value(model.charge_realtime[b, s, t]) for t in model.T]
-                discharge_rt = [value(model.discharge_realtime[b, s, t]) for t in model.T]
+                discharge_rt = [
+                    value(model.discharge_realtime[b, s, t]) for t in model.T
+                ]
                 total_charge = (
                     np.array(battery_ahead[b]["charge"]) + np.array(charge_rt)
                 ).tolist()
@@ -631,7 +648,6 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
                     "export_price_ahead": export_price_ahead,
                     "grid_import_ahead": grid_import_ahead,
                     "grid_export_ahead": grid_export_ahead,
-
                     "import_price_rt": import_price_rt,
                     "export_price_rt": export_price_rt,
                     "grid_import_rt": grid_import_rt,
@@ -715,12 +731,10 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
             ).tolist(),
             "grid_import_ahead": grid_import_ahead,  # First-stage decision
             "grid_export_ahead": grid_export_ahead,
-
             "expected_import_price_rt": expected_import_price_rt.tolist(),
             "expected_export_price_rt": expected_export_price_rt.tolist(),
             "expected_grid_import_rt": expected_grid_import_rt.tolist(),
             "expected_grid_export_rt": expected_grid_export_rt.tolist(),
-
             "total_cost": total_cost,
             "solver_status": str(self.results.solver.termination_condition),
             "objective_value": total_cost,
@@ -753,7 +767,6 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
             "grid_export": results["grid_export"],
             "grid_import_ahead": results["grid_import_ahead"],
             "grid_export_ahead": results["grid_export_ahead"],
-
             "expected_import_price_rt": results["expected_import_price_rt"],
             "expected_export_price_rt": results["expected_export_price_rt"],
             "expected_grid_import_rt": results["expected_grid_import_rt"],
@@ -803,7 +816,6 @@ class StochasticEnergyOptimizer(BaseEnergyOptimizer):
                     "grid_export_ahead": scenario_result["grid_export_ahead"],
                     "grid_import_rt": scenario_result["grid_import_rt"],
                     "grid_export_rt": scenario_result["grid_export_rt"],
-
                     "import_price_ahead": scenario_result["import_price_ahead"],
                     "export_price_ahead": scenario_result["export_price_ahead"],
                     "import_price_rt": scenario_result["import_price_rt"],

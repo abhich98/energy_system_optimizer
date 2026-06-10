@@ -56,7 +56,9 @@ class BaseEnergyOptimizer(ABC):
             raise ValueError("pv_forecast must have same length as load_forecast")
 
         if len(self.import_price_forecast) != n_timesteps:
-            raise ValueError("import_price_forecast must have same length as load_forecast")
+            raise ValueError(
+                "import_price_forecast must have same length as load_forecast"
+            )
 
         if len(self.export_price_forecast) != n_timesteps:
             raise ValueError(

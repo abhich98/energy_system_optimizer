@@ -21,7 +21,6 @@ from esms.eval import OptimizationCostCalculator, DeterministicPerformanceCalcul
 
 from stochastic_optimization import init_wandb
 
-
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -59,8 +58,12 @@ def solve_day_deterministic_with_policy(
     bess_charge_values = np.zeros((len(battery_specs), len(day_df)), dtype=float)
     bess_discharge_values = np.zeros((len(battery_specs), len(day_df)), dtype=float)
     for b_idx, battery in enumerate(battery_specs):
-        bess_charge_values[b_idx, :] = day_df[f"{battery['id']}_charge_ahead"].to_numpy(dtype=float)
-        bess_discharge_values[b_idx, :] = day_df[f"{battery['id']}_discharge_ahead"].to_numpy(dtype=float)
+        bess_charge_values[b_idx, :] = day_df[f"{battery['id']}_charge_ahead"].to_numpy(
+            dtype=float
+        )
+        bess_discharge_values[b_idx, :] = day_df[
+            f"{battery['id']}_discharge_ahead"
+        ].to_numpy(dtype=float)
 
     solver_args = {}
     if solver == "scip":
@@ -99,7 +102,10 @@ def main():
         "--data_file", type=str, required=True, help="Path to the dataset Excel file"
     )
     parser.add_argument(
-        "--policy_file", type=str, required=True, help="Path to the day-ahead policy CSV file"
+        "--policy_file",
+        type=str,
+        required=True,
+        help="Path to the day-ahead policy CSV file",
     )
     parser.add_argument(
         "--battery_file",
@@ -152,9 +158,7 @@ def main():
 
     # Load dataset
     logger.info("Loading dataset from %s", args.data_file)
-    data_df = pd.read_excel(
-        args.data_file, sheet_name=f"{args.year} data"
-    )
+    data_df = pd.read_excel(args.data_file, sheet_name=f"{args.year} data")
     data_df["Date"] = pd.to_datetime(data_df["Date"])
 
     # Load battery specs
@@ -193,25 +197,29 @@ def main():
     else:
         num_days = args.num_days
     start_date = data_df.iloc[day_idx * time_points_per_day]["Date"].date()
-    end_date = data_df.iloc[(day_idx + num_days) * time_points_per_day - 1]["Date"].date()
+    end_date = data_df.iloc[(day_idx + num_days) * time_points_per_day - 1][
+        "Date"
+    ].date()
 
-    wandb_run = init_wandb(config={
-        "data_file": args.data_file,
-        "policy_file": args.policy_file,
-        "battery_file": args.battery_file,
-        "year": args.year,
-
-        "start_day_index": args.start_day_index,
-        "num_days": num_days,
-
-        "wandb":{
-        "enabled": args.wandb_track,
-        "run_name": "stochastic_policy_eval"
+    wandb_run = init_wandb(
+        config={
+            "data_file": args.data_file,
+            "policy_file": args.policy_file,
+            "battery_file": args.battery_file,
+            "year": args.year,
+            "start_day_index": args.start_day_index,
+            "num_days": num_days,
+            "wandb": {
+                "enabled": args.wandb_track,
+                "run_name": "stochastic_policy_eval",
+            },
         }
-    })
+    )
 
     logger.info("=" * 60)
-    logger.info("EsMS Energy Optimizer - Deterministic Optimization (Parallel) For Policy Evaluation")
+    logger.info(
+        "EsMS Energy Optimizer - Deterministic Optimization (Parallel) For Policy Evaluation"
+    )
     logger.info(f"Date range: {start_date} to {end_date}")
     logger.info(f"Number of days: {num_days}")
     logger.info(f"Number of batteries: {len(def_battery_specs)}")
@@ -226,7 +234,9 @@ def main():
         day_results = Parallel(n_jobs=-1)(
             delayed(solve_day_deterministic_with_policy)(
                 day_df=data_df.iloc[
-                    day_idx * time_points_per_day + i * time_points_per_day : day_idx * time_points_per_day + (i + 1) * time_points_per_day
+                    day_idx * time_points_per_day
+                    + i * time_points_per_day : day_idx * time_points_per_day
+                    + (i + 1) * time_points_per_day
                 ],
                 battery_specs=deepcopy(def_battery_specs),
                 solver=solver_to_use,
@@ -246,7 +256,9 @@ def main():
         logger.info("OPTIMIZATION COMPLETED")
         logger.info("=" * 60)
         logger.info(f"Optimization completed in {elapsed_time}")
-        logger.info(f"Generated output has {len(results_df) // time_points_per_day} days")
+        logger.info(
+            f"Generated output has {len(results_df) // time_points_per_day} days"
+        )
 
         cost_calculator = OptimizationCostCalculator(dt_hours=timestep_hours)
         cost_breakdown = cost_calculator.calculate_from_dataframe(
@@ -277,7 +289,6 @@ def main():
                     "final_cost/import": cost_breakdown.import_cost,
                     "final_cost/export_revenue": cost_breakdown.export_revenue,
                     "final_cost/degradation": cost_breakdown.degradation_cost,
-
                     "performance/total_grid_import_kwh": performance_breakdown.total_grid_import_kwh,
                     "performance/total_grid_export_kwh": performance_breakdown.total_grid_export_kwh,
                     "performance/pv_self_consumed_kwh": performance_breakdown.pv_self_consumed_kwh,
@@ -285,7 +296,6 @@ def main():
                     "performance/self_consumption_ratio": performance_breakdown.self_consumption_ratio,
                     "performance/self_sufficiency_ratio": performance_breakdown.self_sufficiency_ratio,
                     "performance/grid_dependency_ratio": performance_breakdown.grid_dependency_ratio,
-
                     "run/elapsed_seconds": elapsed_time.total_seconds(),
                 }
             )
