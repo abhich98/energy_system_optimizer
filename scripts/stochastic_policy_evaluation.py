@@ -19,7 +19,7 @@ from esms.optimization import EnergyOptimizer
 from esms.utils import get_available_pyomo_solvers
 from esms.eval import OptimizationCostCalculator, DeterministicPerformanceCalculator
 
-from stochastic_optimization import init_wandb
+from stochastic_optimization import init_wandb, load_config
 
 # Setup logging
 logging.basicConfig(
@@ -114,6 +114,12 @@ def main():
         help="Path to the battery configuration JSON file",
     )
     parser.add_argument(
+        "--config_file",
+        type=str,
+        required=False,
+        help="Path to YAML configuration file.",
+    )
+    parser.add_argument(
         "--year",
         type=int,
         default=2025,
@@ -125,7 +131,7 @@ def main():
         type=int,
         default=0,
         required=False,
-        help="Index of the first day to evaluate (0-364)",
+        help="Index of the first day to evaluate in the policy dataset (0-based)",
     )
     parser.add_argument(
         "--num_days",
@@ -155,6 +161,10 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.config_file:
+        config = load_config(args.config_file)
+    else:
+        config = {}
 
     # Load dataset
     logger.info("Loading dataset from %s", args.data_file)
@@ -201,20 +211,19 @@ def main():
         "Date"
     ].date()
 
-    wandb_run = init_wandb(
-        config={
-            "data_file": args.data_file,
-            "policy_file": args.policy_file,
-            "battery_file": args.battery_file,
-            "year": args.year,
-            "start_day_index": args.start_day_index,
-            "num_days": num_days,
-            "wandb": {
-                "enabled": args.wandb_track,
-                "run_name": "stochastic_policy_eval",
-            },
-        }
-    )
+    config["data_file"] = args.data_file
+    config["policy_file"] = args.policy_file
+    config["battery_file"] = args.battery_file
+    config["year"] = args.year
+
+    config["start_day_index"] = args.start_day_index
+    config["num_days"] = num_days
+    config["solver"] = solver_to_use
+
+    config["wandb"]["enabled"] = args.wandb_track
+    config["wandb"]["run_name"] = f"stochastic_policy_eval_2"
+
+    wandb_run = init_wandb(config=config)
 
     logger.info("=" * 60)
     logger.info(
