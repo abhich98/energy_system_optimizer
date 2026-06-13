@@ -100,12 +100,21 @@ $$\text{Cost Savings (\\%)} = \frac{\text{Cost}_{\text{no battery}} - \text{Cost
 
 - Considering a household on a dynamic electricity tariff with a PV system and a BESS, the cost savings from using an EMS depend on various factors, including the size of the PV system, the capacity of the battery, etc. Read [] for the configuration parameters used in the experiments. 
 
-- Since the prices considered in the experiments are derived and built on assumptions, the absolute cost savings (e.g., in euros) may not be meaningful. Instead, relative cost savings (e.g., percentage reduction) are more informative. **NO CLAIMS ARE MADE**.
+- Since the prices considered in the experiments are derived based on assumptions, the absolute cost savings (e.g., in euros) may not be meaningful. Instead, relative cost savings (e.g., percentage reduction) are presented which are more informative. **NO CLAIMS ARE MADE**.
 
-### Uncertainty Modelling and Cost Savings
+- **Analysis time period**: 275 days (Apr, 2025 - Dec, 2025) with data resolution of 15 minutes.
+
+- **Perfect foresight** represents the theoretical upper bound of cost savings, where the future load, PV generation, and energy prices are perfectly known in advance.
+
+### 1) Number of Scenarios (Uncertainty Modelling) and Cost Savings
+**Why this matters:** The number of scenarios used in the stochastic optimization and method of generation significantly impact the performance of the EMS. More scenarios can capture a wider range of possible future outcomes, but also increase computational complexity. Also, it gives an idea of how much historical data is required.
+
+**Observations:** The cost savings increase with the number of scenarios, but with diminishing returns. The best stochastic policy (20 scenarios) achieves around 3.87% (vs no-battery), while 11.91% reduction is possible with perfect foresight.
+
 ![Cost savings vs number of scenarios](./data/data_household_germany/generated/cost_reduction_vs_scenarios.png)
+Two scenario generation approaches are compared here: (1) generating `N` scenarios of day-ahead load and PV generation using past `P` days (left), and (2) taking the past `P` days directly as scenarios (right). The latter approach performed better suggesting that *relying on the immediate past may be more informative for forecasting the next day than on a wider historical window, within the structure of the implemented EMS strategy.*
 
-### Key Performance Indicators
+### 2) Key Performance Indicators
 
 | Metric/Key | No Battery | **Battery + (best) Stochastic Policy** | Battery + Perfect Foresight |
 |---|---:|---:|---:|
@@ -131,8 +140,20 @@ $$\text{Cost Savings (\\%)} = \frac{\text{Cost}_{\text{no battery}} - \text{Cost
 | pv_self_consumed_kwh | 1772.96 | 2281.62 | 2789.47 | 
 | load_served_locally_kwh | 1772.96 | 2263.82 | 2781.03 | -->
 
-### Daily Cost Comparison
+**Why these matter:** Along with cost savings, EMS performance is evaluated using metrics such as self-consumption ratio (share of PV consumed locally), self-sufficiency ratio (share of load served by local generation), and grid dependency ratio (share of load served by the grid). These metrics support decision-making and help choose suitable PV and battery configurations for a household.
+
+<!-- grid dependency ratio and self-sufficiency ratio may add up to more than 1 because the battery can charge from the grid and discharge to serve the load, which causes energy losses.  -->
+
+### 3) Daily Cost Comparison
+**Why this matters:** Understanding how cost savings vary over time (e.g., by season) shows whether benefits are consistent or concentrated in specific periods. This helps identify when the EMS is most effective and where improvements are needed.
+
+**Observations:** Cost savings are not uniform across days. In winter, limited PV generation leads to minimal savings, and in summer, higher PV generation enables larger savings. However, *the current EMS strategy does not fully capture this potential, suggesting room for improvement in optimization logic and/or forecasting accuracy.*
+
 ![Cost savings over time](./data/data_household_germany/generated/daily_costs.png)
+
+### Future work includes:
+- Implementing and comparing different forecasting methods (e.g., LSTMs, GMMs, Markov processes) for scenario generation.
+- Revenue from energy export is not considered in the current implementation, arbitrage opportunities (buy low, sell high) can be explored in future work.
 
 ## 🔧 Development
 ### Python and libraries
