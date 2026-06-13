@@ -47,6 +47,9 @@ async def optimize(
         ..., description="Battery configuration JSON file"
     ),
     forecasts_csv: UploadFile = File(..., description="Forecast data CSV file"),
+    fix_decision_vars_csv: Optional[UploadFile] = File(
+        None, description="Optional fixed decision variables CSV file"
+    ),
     config_json: Optional[UploadFile] = File(
         None, description="Optional solver configuration JSON file"
     ),
@@ -59,6 +62,7 @@ async def optimize(
     - forecasts_csv: Time series with pv, load, price columns
 
     Optional files:
+    - fix_decision_vars_csv: Fixed decision variables CSV file
     - config_json: Solver configuration (defaults to SCIP LP)
 
     Returns:
@@ -79,6 +83,18 @@ async def optimize(
         forecasts = IOService.parse_forecasts_csv(forecasts_content)
         logger.info(f"Parsed {len(forecasts['pv'])} timesteps")
 
+        # Parse fixed decision variables (optional)
+        logger.info("Parsing fix_decision_vars.csv...")
+        fix_decision_vars_content = (
+            await fix_decision_vars_csv.read() if fix_decision_vars_csv else None
+        )
+        fix_decision_vars = IOService.parse_fix_decision_vars_csv(
+            fix_decision_vars_content, [b.id for b in batteries]
+        )
+        logger.info(
+            f"Parsed fixed decision variables: {list(fix_decision_vars.keys())}"
+        )
+
         # Parse config (optional)
         logger.info("Parsing config.json...")
         config_content = await config_json.read() if config_json else None
@@ -87,7 +103,12 @@ async def optimize(
 
         # Run optimization
         logger.info("Running optimization...")
-        results_df = OptimizationService.optimize(batteries, forecasts, config)
+        results_df = OptimizationService.optimize(
+            batteries,
+            forecasts,
+            fix_decision_vars,
+            config,
+        )
 
         # Convert to CSV
         csv_content = IOService.results_to_csv(results_df)
@@ -100,6 +121,99 @@ async def optimize(
             media_type="text/csv",
             headers={
                 "Content-Disposition": "attachment; filename=optimization_schedule.csv"
+            },
+        )
+
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except RuntimeError as e:
+        logger.error(f"Optimization error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {e}")
+
+
+@router.post("/stochastic-optimize")
+async def stochastic_optimize(
+    batteries_json: UploadFile = File(
+        ..., description="Battery configuration JSON file"
+    ),
+    scenarios_csv: UploadFile = File(
+        ...,
+        description=(
+            "Scenario CSV with timestamp/Date, scenario, probability, pv, load, "
+            "import_price_rt, and optional export_price_rt"
+        ),
+    ),
+    ahead_prices_csv: UploadFile = File(
+        ...,
+        description=(
+            "Ahead-price CSV with timestamp/Date, import_price_ahead, and optional export_price_ahead"
+        ),
+    ),
+    schedule_bess: bool = File(
+        False,
+        description="Whether to include BESS scheduling in the optimization (default: false)",
+    ),
+    config_json: Optional[UploadFile] = File(
+        None, description="Optional solver configuration JSON file"
+    ),
+):
+    """Run stochastic optimization with explicit scenario inputs and return expected results as CSV."""
+    logger.info("Received stochastic optimization request")
+
+    try:
+        logger.info("Parsing batteries.json...")
+        batteries_content = await batteries_json.read()
+        batteries = IOService.parse_batteries_json(batteries_content)
+        logger.info("Parsed %s batteries", len(batteries))
+
+        logger.info("Parsing scenarios.csv...")
+        scenarios_content = await scenarios_csv.read()
+        scenarios = IOService.parse_stochastic_scenarios_csv(scenarios_content)
+        logger.info(
+            "Parsed %s scenarios with %s timesteps each",
+            scenarios["load_scenarios"].shape[0],
+            scenarios["load_scenarios"].shape[1],
+        )
+
+        logger.info("Parsing ahead_prices.csv...")
+        ahead_prices_content = await ahead_prices_csv.read()
+        ahead_prices = IOService.parse_ahead_prices_csv(
+            ahead_prices_content,
+            expected_timestamps=scenarios["timestamps"],
+        )
+        logger.info(
+            "Parsed %s ahead timesteps", len(ahead_prices["import_price_ahead"])
+        )
+
+        logger.info("Parsing config.json...")
+        config_content = await config_json.read() if config_json else None
+        config = IOService.parse_config_json(config_content)
+        logger.info("Configuration: solver=%s", config.solver)
+
+        logger.info("Running stochastic optimization...")
+        results_df = OptimizationService.optimize_stochastic(
+            batteries=batteries,
+            scenarios=scenarios,
+            ahead_prices=ahead_prices,
+            schedule_bess=schedule_bess,
+            config=config,
+        )
+
+        csv_content = IOService.results_to_csv(results_df)
+
+        logger.info("Stochastic optimization completed successfully")
+
+        return StreamingResponse(
+            io.BytesIO(csv_content.encode("utf-8")),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=stochastic_optimization_schedule.csv"
             },
         )
 

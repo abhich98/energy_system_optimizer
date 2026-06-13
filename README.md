@@ -98,7 +98,7 @@ $$\text{Cost Savings (\\%)} = \frac{\text{Cost}_{\text{no battery}} - \text{Cost
 
 ## *how much money can be saved?* (Results)
 
-- Considering a household on a dynamic electricity tariff with a PV system and a BESS, the cost savings from using an EMS depend on various factors, including the size of the PV system, the capacity of the battery, etc. Read [] for the configuration parameters used in the experiments. 
+- Considering a household on a dynamic electricity tariff with a PV system and a BESS, the cost savings from using an EMS depend on various factors, including the size of the PV system, the capacity of the battery, etc. Read config files ([battery](./config/sonnenBatterie10.json), [optimization](./config/stochastic_optimization_config.yaml)) for the parameters used in the experiments. 
 
 - Since the prices considered in the experiments are derived based on assumptions, the absolute cost savings (e.g., in euros) may not be meaningful. Instead, relative cost savings (e.g., percentage reduction) are presented which are more informative. **NO CLAIMS ARE MADE**.
 

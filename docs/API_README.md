@@ -35,6 +35,7 @@ uvicorn esms.api.main:app --reload --host 0.0.0.0 --port 8000
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/optimize` | POST | Run energy optimization |
+| `/stochastic-optimize` | POST | Run stochastic optimization from explicit scenarios |
 | `/docs` | GET | Interactive API documentation |
 
 ### Optimization Request
@@ -42,7 +43,8 @@ uvicorn esms.api.main:app --reload --host 0.0.0.0 --port 8000
 **Required Files:**
 1. `batteries.json` - Battery configuration
 2. `forecasts.csv` - Time series forecasts
-3. `config.json` - Solver configuration (optional)
+3. `fix_decision_vars.csv` (optional) - Fix certain decision variables during optimization
+4. `config.json` - Solver configuration (optional)
 
 #### Example Request
 
@@ -50,6 +52,7 @@ uvicorn esms.api.main:app --reload --host 0.0.0.0 --port 8000
 curl -X POST http://localhost:8000/optimize \
   -F "batteries_json=@batteries.json" \
   -F "forecasts_csv=@forecasts.csv" \
+  -F "fix_decision_vars_csv=@fix_decision_vars.csv" \
   -F "config_json=@config.json" \
   -o schedule.csv
 ```
@@ -62,6 +65,7 @@ import requests
 files = {
     'batteries_json': open('batteries.json', 'rb'),
     'forecasts_csv': open('forecasts.csv', 'rb'),
+    'fix_decision_vars_csv': open('fix_decision_vars.csv', 'rb'),
     'config_json': open('config.json', 'rb')
 }
 
@@ -69,6 +73,25 @@ response = requests.post('http://localhost:8000/optimize', files=files)
 
 with open('schedule.csv', 'wb') as f:
     f.write(response.content)
+```
+
+### Stochastic Optimization Request
+
+**Required Files:**
+1. `batteries.json` - Battery configuration
+2. `scenarios.csv` - Explicit scenario inputs
+3. `ahead_prices.csv` - Shared ahead prices per timestep
+4. `config.json` - Solver configuration (optional)
+
+#### Example Request
+
+```bash
+curl -X POST http://localhost:8000/stochastic-optimize \
+  -F "batteries_json=@batteries.json" \
+  -F "scenarios_csv=@scenarios.csv" \
+  -F "ahead_prices_csv=@ahead_prices.csv" \
+  -F "config_json=@config.json" \
+  -o stochastic_schedule.csv
 ```
 
 ---
@@ -90,7 +113,8 @@ Array of battery configurations:
     "discharge_efficiency": 0.95,
     "initial_soc": 50.0,
     "min_soc": 10.0,
-    "max_soc": 100.0
+    "max_soc": 100.0,
+    "degradation_cost": 0.04,
   }
 ]
 ```
@@ -105,6 +129,7 @@ Array of battery configurations:
 - `initial_soc` (float): Initial state of charge in kWh
 - `min_soc` (float, optional): Minimum SOC in kWh (default: 0)
 - `max_soc` (float, optional): Maximum SOC in kWh (default: capacity)
+- `degradation_cost` (float, optional): Degradation cost per kWh cycled in EUR/kWh (default: 0)
 
 ### 2. forecasts.csv
 
@@ -118,6 +143,43 @@ timestep,pv,load,price,export_price
 ```
 
 **Columns:**
+
+### 3. scenarios.csv
+
+Scenario-wise time series with required columns:
+
+```csv
+timestamp,scenario,probability,pv,load,import_price_rt,export_price_rt
+2025-01-01 00:00:00,0,0.5,0.0,30.0,0.12,0.00
+2025-01-01 00:15:00,0,0.5,0.1,29.5,0.13,0.00
+2025-01-01 00:00:00,1,0.5,0.0,31.0,0.11,0.00
+...
+```
+
+**Columns:**
+- `timestamp` or `Date`: Timestep timestamp. Must match across scenarios.
+- `scenario`: Scenario identifier.
+- `probability`: Scenario probability. Must be constant within each scenario and sum to 1 across scenarios.
+- `pv`: PV generation in kW.
+- `load`: Load in kW.
+- `import_price_rt` or `import_price_realtime`: Real-time import price in EUR/kWh.
+- `export_price_rt` or `export_price_realtime` (optional): Real-time export price in EUR/kWh. Defaults to 0.
+
+### 4. ahead_prices.csv
+
+Shared ahead-price time series:
+
+```csv
+timestamp,import_price_ahead,export_price_ahead
+2025-01-01 00:00:00,0.10,0.00
+2025-01-01 00:15:00,0.11,0.00
+...
+```
+
+**Columns:**
+- `timestamp` or `Date`: Timestep timestamp. Must match the scenario timestamps exactly.
+- `import_price_ahead`: Ahead import price in EUR/kWh.
+- `export_price_ahead` (optional): Ahead export price in EUR/kWh. Defaults to 0.
 - `pv` (float): PV generation forecast in kW
 - `load` (float): Load demand forecast in kW
 - `price` (float): Electricity import price in EUR/kWh
