@@ -1,0 +1,19 @@
+start_day_index: 90
+num_days: 275
+history_days: 20
+
+pv_coeff: 0.5
+load_coeff: 0.5
+random_state: 3
+n_jobs: -1
+
+solver: scip
+
+wandb:
+  project: esms-stochastic-optimization
+  entity:
+  run_name: "stochastic_policy_gen_2"
+  tags:
+    - stochastic
+    - scenario-based
+    - kmedoids

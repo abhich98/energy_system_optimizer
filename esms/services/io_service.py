@@ -8,6 +8,8 @@ import pandas as pd
 from esms.api.schemas import SolverConfig
 from esms.models import Battery
 
+FORECASTS_CSV_REQUIRED_COLUMNS = ["pv", "load", "price"]
+
 
 class IOService:
     """Service for handling input/output operations."""
@@ -70,7 +72,7 @@ class IOService:
             raise ValueError(f"Invalid CSV in forecasts file: {e}")
 
         # Validate required columns
-        required_columns = ["pv", "load", "price"]
+        required_columns = FORECASTS_CSV_REQUIRED_COLUMNS
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             raise ValueError(

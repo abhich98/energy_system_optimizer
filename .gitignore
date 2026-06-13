@@ -12,4 +12,7 @@ wheels/
 # VS Code settings
 .vscode/
 
+# wandb tracking
+wandb/
+
 archive/

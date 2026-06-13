@@ -40,7 +40,7 @@ class EnergyOptimizer(BaseEnergyOptimizer):
         batteries: List[Battery],
         load_forecast,
         pv_forecast,
-        price_forecast,
+        import_price_forecast,
         export_price_forecast: Optional[Sequence[float]] = None,
         timestep_hours: float = 1.0,
     ):
@@ -51,7 +51,7 @@ class EnergyOptimizer(BaseEnergyOptimizer):
             batteries: List of Battery objects
             load_forecast: Load demand forecast (kW) for each timestep
             pv_forecast: PV generation forecast (kW) for each timestep
-            price_forecast: Electricity price forecast (EUR/kWh) for each timestep
+            import_price_forecast: Electricity import price forecast (EUR/kWh) for each timestep
             export_price_forecast: Electricity export price forecast (EUR/kWh) for each timestep
             timestep_hours: Duration of each timestep in hours (default: 1.0)
             solver: Solver to use ('glpk', 'cbc', 'gurobi', etc.)
@@ -60,12 +60,18 @@ class EnergyOptimizer(BaseEnergyOptimizer):
             batteries=batteries,
             load_forecast=load_forecast,
             pv_forecast=pv_forecast,
-            price_forecast=price_forecast,
+            import_price_forecast=import_price_forecast,
             export_price_forecast=export_price_forecast,
             timestep_hours=timestep_hours,
         )
 
-    def build_model(self) -> ConcreteModel:
+    def build_model(
+        self,
+        grid_import_values=None,
+        grid_export_values=None,
+        charge_values=None,
+        discharge_values=None,
+    ) -> ConcreteModel:
         """
         Build the Pyomo optimization model.
 
@@ -86,8 +92,8 @@ class EnergyOptimizer(BaseEnergyOptimizer):
             model.T, initialize={t: self.load_forecast[t] for t in model.T}
         )
         model.PV = Param(model.T, initialize={t: self.pv_forecast[t] for t in model.T})
-        model.Price = Param(
-            model.T, initialize={t: self.price_forecast[t] for t in model.T}
+        model.ImportPrice = Param(
+            model.T, initialize={t: self.import_price_forecast[t] for t in model.T}
         )
         model.ExportPrice = Param(
             model.T, initialize={t: self.export_price_forecast[t] for t in model.T}
@@ -135,6 +141,11 @@ class EnergyOptimizer(BaseEnergyOptimizer):
 
         model.MaxSOC = Param(model.B, initialize=init_max_soc)
 
+        def init_deg_cost(model, b):
+            return self.batteries[b].degradation_cost
+
+        model.DegCost = Param(model.B, initialize=init_deg_cost)
+
         # Decision Variables
         model.charge = Var(
             model.B, model.T, domain=NonNegativeReals, doc="Battery charge power (kW)"
@@ -154,6 +165,21 @@ class EnergyOptimizer(BaseEnergyOptimizer):
         model.grid_export = Var(
             model.T, domain=NonNegativeReals, doc="Grid export power (kW)"
         )
+        # Fix variables if values are provided (for warm-starting or policy evaluation)
+        if grid_import_values is not None:
+            for t in model.T:
+                model.grid_import[t].fix(grid_import_values[t])
+        if grid_export_values is not None:
+            for t in model.T:
+                model.grid_export[t].fix(grid_export_values[t])
+        if charge_values is not None:
+            for b in model.B:
+                for t in model.T:
+                    model.charge[b, t].fix(charge_values[b][t])
+        if discharge_values is not None:
+            for b in model.B:
+                for t in model.T:
+                    model.discharge[b, t].fix(discharge_values[b][t])
 
         # Binary variable for charge/discharge state (MILP constraint)
         model.u = Var(
@@ -173,10 +199,16 @@ class EnergyOptimizer(BaseEnergyOptimizer):
         def objective_rule(model):
             return sum(
                 (
-                    model.grid_import[t] * model.Price[t]
+                    model.grid_import[t] * model.ImportPrice[t]
                     - model.grid_export[t] * model.ExportPrice[t]
                 )
                 * model.dt
+                + sum(
+                    model.DegCost[b]
+                    * (model.charge[b, t] + model.discharge[b, t])
+                    * model.dt
+                    for b in model.B
+                )
                 for t in model.T
             )
 

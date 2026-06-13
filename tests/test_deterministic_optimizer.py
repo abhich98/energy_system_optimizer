@@ -119,7 +119,7 @@ def optimize_with_esms(
         batteries=batteries,
         load_forecast=load_kw,
         pv_forecast=pv_kw,
-        price_forecast=price_eur_per_kwh,
+        import_price_forecast=price_eur_per_kwh,
         timestep_hours=timestep_hours,
     )
 
@@ -130,15 +130,15 @@ def optimize_with_esms(
 
 
 @pytest.fixture
-def test_data():
+def test_gecad_data():
     """Load test data for optimization comparison."""
     # Load forecast data
     forecast_df = pd.read_excel(
-        "data/Dataset.xlsx", sheet_name="2023 data", usecols="A:F", nrows=8762
+        "data/data_GECAD_portugal/Dataset.xlsx", sheet_name="2023 data", usecols="A:F", nrows=8762
     )
 
     # Load battery configuration
-    with open("examples/sample_BESS.json", "r") as f:
+    with open("config/sample_BESS.json", "r") as f:
         batteries = json.load(f)
 
     # Select a specific day for reproducibility
@@ -150,6 +150,46 @@ def test_data():
     for bc in batteries:
         bc["max_discharge"] = bc["max_charge"]  # Ensure max discharge equals max charge
         bc["min_soc"] = 0.0  # Set min SOC to 0 for both optimizers
+        bc["degradation_cost"] = 0.0  # Set degradation cost to 0 for both optimizers
+
+    # Extract forecasts
+    pv_forecast = forecast_df_day["PV generation (kW)"].values
+    load_forecast = forecast_df_day["Consumption (kW)"].values
+    price_forecast_mwh = forecast_df_day["Energy price (EUR/MWh)"].values
+    price_forecast_kwh = price_forecast_mwh / 1000.0  # Convert EUR/MWh to EUR/kWh
+    hours = pd.DatetimeIndex(forecast_df_day["Date"])
+
+    return {
+        "pv_forecast": pv_forecast,
+        "load_forecast": load_forecast,
+        "price_forecast_mwh": price_forecast_mwh,
+        "price_forecast_kwh": price_forecast_kwh,
+        "batteries": batteries,
+        "hours": hours,
+        "date": date,
+        "day_idx": day_idx,
+    }
+
+@pytest.fixture
+def test_germany_data():
+    """Load test data for optimization comparison from Germany dataset."""
+    # Load forecast data
+    data_version = "1.2.0"
+    data_year = 2025
+    time_res_hrs = 0.25
+
+    forecast_df = pd.read_excel(
+        f"data/data_household_germany/Dataset_v{data_version}.xlsx", sheet_name=f"{data_year} data"
+    )
+
+    # Load battery configuration
+    with open("config/sonnenBatterie10.json", "r") as f:
+        batteries = json.load(f)
+
+    # Select a specific day for reproducibility
+    day_idx = 123
+    date = forecast_df.iloc[day_idx * int(24 / time_res_hrs)]["Date"].date()
+    forecast_df_day = forecast_df.iloc[day_idx * int(24 / time_res_hrs) : (day_idx + 1) * int(24 / time_res_hrs)]
 
     # Extract forecasts
     pv_forecast = forecast_df_day["PV generation (kW)"].values
@@ -170,7 +210,7 @@ def test_data():
     }
 
 
-def test_esms_vs_pypsa_optimization(test_data):
+def test_esms_vs_pypsa_optimization(test_gecad_data):
     """
     Test that EsMS and PyPSA produce similar optimization results.
 
@@ -180,17 +220,19 @@ def test_esms_vs_pypsa_optimization(test_data):
     """
     logger.info("=" * 40)
     logger.info("Testing EsMS vs PyPSA Optimization Comparison")
-    logger.info(f"Selected day: {test_data['date']} (index {test_data['day_idx']})")
+    logger.info(f"Selected day: {test_gecad_data['date']} (index {test_gecad_data['day_idx']})")
     logger.info("=" * 40)
 
     # Run EsMS optimization
     logger.info("Running EsMS optimization...")
+    timestep_hours = (test_gecad_data["hours"][1] - test_gecad_data["hours"][0]).total_seconds() / 3600.0
+    logger.info(f"Timestep duration: {timestep_hours:.2f} hours")
     esms_cost = optimize_with_esms(
-        pv_kw=test_data["pv_forecast"],
-        load_kw=test_data["load_forecast"],
-        price_eur_per_kwh=test_data["price_forecast_kwh"],
-        battery_config=test_data["batteries"],
-        timestep_hours=1.0,
+        pv_kw=test_gecad_data["pv_forecast"],
+        load_kw=test_gecad_data["load_forecast"],
+        price_eur_per_kwh=test_gecad_data["price_forecast_kwh"],
+        battery_config=test_gecad_data["batteries"],
+        timestep_hours=timestep_hours,
     )
     logger.info(f"EsMS optimal cost: {esms_cost:.2f} EUR")
 
@@ -198,11 +240,11 @@ def test_esms_vs_pypsa_optimization(test_data):
     logger.info("Running PyPSA optimization...")
     pypsa_cost = optimize_with_pypsa(
         # Note: PyPSA expects MW and EUR/MWh, so we pass the original data assuming that it in MW while it is in kW.
-        pv_mw=test_data["pv_forecast"],
-        load_mw=test_data["load_forecast"],
-        price_eur_per_mwh=test_data["price_forecast_mwh"],
-        battery_config=test_data["batteries"],
-        hours=test_data["hours"],
+        pv_mw=test_gecad_data["pv_forecast"],
+        load_mw=test_gecad_data["load_forecast"],
+        price_eur_per_mwh=test_gecad_data["price_forecast_mwh"],
+        battery_config=test_gecad_data["batteries"],
+        hours=test_gecad_data["hours"],
     )
     pypsa_cost /= 1000.0  # Correction for passing kW data as MW to PyPSA
     logger.info(f"PyPSA optimal cost: {pypsa_cost:.2f} EUR")

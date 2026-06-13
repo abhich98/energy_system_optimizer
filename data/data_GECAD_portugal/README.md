@@ -53,4 +53,4 @@ This dataset is released under the Creative Commons Attribution 4.0 Internationa
 ## Citation
 If you use this dataset, please cite:
 
-Tayenne, L., Bruno, R., Pedro, F., Luis, G., & Zita, V. (2025). Dataset for daily energy management: Renewable generation, consumption, and storage (v1.0) [Data set]. Zenodo. https://doi.org/10.5281/zenodo.14918474
+Tayenne, L., Bruno, R., Pedro, F., Luis, G., & Zita, V. (2025). Dataset for daily energy management: Renewable generation, consumption, and storage (v1.1) [Data set]. Zenodo. https://doi.org/10.5281/zenodo.15394961

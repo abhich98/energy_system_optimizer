@@ -3,7 +3,7 @@ name: Test Deterministic Optimizer
 on:
 
   push:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
     test_det_optimizer:
@@ -30,6 +30,4 @@ jobs:
             - name: Run tests
               run: |
                 source .venv/bin/activate
-                pytest scripts/test_deterministic_optimizer.py -v -s
-                pytest scripts/test_stochastic_optimizer.py -v -s
-            
+                pytest tests/. -v -s

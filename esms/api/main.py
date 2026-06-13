@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="EsMS Energy Optimization API",
+    title="EsMS Optimization API",
     description="REST API for day-ahead or long-term energy management optimization",
     version=__version__,
     # Auto-generated docs will be available at /docs and /redoc

@@ -1,0 +1,5 @@
+volatility_range: [0.00, 0.0]  # volatility as a fraction of the current price, then set as standard deviation of a normal distribution
+
+jump_prob: 0.00
+
+jump_magnitude_range: [0.0, 0.0]  # Jump magnitude as a fraction of the current price

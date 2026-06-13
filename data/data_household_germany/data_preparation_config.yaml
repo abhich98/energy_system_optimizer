@@ -1,0 +1,24 @@
+version: 1.2.0
+household_id: SFH9
+PV_ratio: 15 / 58 # Number of modules assumed / number of modules in the PV system, to scale the PV generation to the household load
+
+year: 2025
+time_delta: 0.25 # in hours
+prices_fixed_comp_euro_kwh: 0.247 # in €/kWh, to be added to the spot market price to create a more realistic dynamic tariff for the optimization model
+
+input:
+  hdf5_file: 2019_data_15min.hdf5
+  prices_file: Day-ahead_prices_202501010000_202601010000_Quarterhour.csv
+tables:
+  pv: MISC/PV1/PV/INVERTER/SOUTH/table/
+  household: NO_PV/{household_id}/HOUSEHOLD/table/
+  heatpump: NO_PV/{household_id}/HEATPUMP/table/
+columns:
+  time: index
+  power: P_TOT
+  price_time: Start date
+  price_mwh: Germany/Luxembourg [€/MWh] Original resolutions
+output:
+  directory: data/data_household_germany
+  filename_stem: Dataset
+  sheet_name: 2025 data

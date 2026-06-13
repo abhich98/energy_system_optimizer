@@ -32,7 +32,7 @@ async def health_check():
     if not available_solvers:
         status["status"] = "Unhealthy"
         status["error"] = (
-            f"No available solvers found. Please install at least one of the follwing solvers: {SUGGESTED_SOLVERS}"
+            f"No available solvers found. Please install at least one of the following solvers: {SUGGESTED_SOLVERS}"
         )
     else:
         status["status"] = "Healthy"
