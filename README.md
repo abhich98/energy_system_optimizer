@@ -109,7 +109,7 @@ $$\text{Cost Savings (\\%)} = \frac{\text{Cost}_{\text{no battery}} - \text{Cost
 ### 1) Number of Scenarios (Uncertainty Modelling) and Cost Savings
 **Why this matters:** The number of scenarios used in the stochastic optimization and method of generation significantly impact the performance of the EMS. More scenarios can capture a wider range of possible future outcomes, but also increase computational complexity. Also, it gives an idea of how much historical data is required.
 
-**Observations:** The cost savings increase with the number of scenarios, but with diminishing returns. The best stochastic policy (20 scenarios) achieves around 3.87% (vs no-battery), while 11.91% reduction is possible with perfect foresight.
+**Observations:** The cost savings increase with the number of scenarios, but with diminishing returns. The best stochastic policy **(20 scenarios) achieves around 3.87%**, while 11.91% reduction is possible with perfect foresight.
 
 ![Cost savings vs number of scenarios](./data/data_household_germany/generated/cost_reduction_vs_scenarios.png)
 Two scenario generation approaches are compared here: (1) generating `N` scenarios of day-ahead load and PV generation using past `P` days (left), and (2) taking the past `P` days directly as scenarios (right). The latter approach performed better suggesting that *relying on the immediate past may be more informative for forecasting the next day than on a wider historical window, within the structure of the implemented EMS strategy.*
@@ -140,7 +140,7 @@ Two scenario generation approaches are compared here: (1) generating `N` scenari
 | pv_self_consumed_kwh | 1772.96 | 2281.62 | 2789.47 | 
 | load_served_locally_kwh | 1772.96 | 2263.82 | 2781.03 | -->
 
-**Why these matter:** Along with cost savings, EMS performance is evaluated using metrics such as self-consumption ratio (share of PV consumed locally), self-sufficiency ratio (share of load served by local generation), and grid dependency ratio (share of load served by the grid). These metrics support decision-making and help choose suitable PV and battery configurations for a household.
+**Why these matter:** Along with cost savings, EMS performance is evaluated using metrics such as **self-consumption ratio** (share of PV consumed locally), **self-sufficiency ratio** (share of load served by local generation), and **grid dependency ratio** (share of load served by the grid). These metrics support decision-making and help choose suitable PV and battery configurations for a household.
 
 <!-- grid dependency ratio and self-sufficiency ratio may add up to more than 1 because the battery can charge from the grid and discharge to serve the load, which causes energy losses.  -->
 
@@ -151,9 +151,18 @@ Two scenario generation approaches are compared here: (1) generating `N` scenari
 
 ![Cost savings over time](./data/data_household_germany/generated/daily_costs.png)
 
-### Future work includes:
+## Live API
+Interactive API docs: https://esms-chft.onrender.com/docs
+
+Health check: https://esms-chft.onrender.com/health
+
+The endpoint offers 2 (FastAPI) services: 1) `POST /optimize` to run deterministic optimization with load, PV, and price forecasts as input, and 2) `POST / stochastic_optimize` to run two-stage stochastic optimization from explicit scenarios. The API accepts JSON input for battery parameters and CSV files for forecasts and scenarios. Read the [API documentation](./docs/API_README.md) for details on the input format.
+
+
+## Future work includes:
 - Implementing and comparing different forecasting methods (e.g., LSTMs, GMMs, Markov processes) for scenario generation.
 - Revenue from energy export is not considered in the current implementation, arbitrage opportunities (buy low, sell high) can be explored in future work.
+- Implementing MPC-based receding horizon control, where the optimization is repeated every 15 minutes with updated forecasts and system states, rather than following a fixed day-ahead schedule.
 
 ## 🔧 Development
 ### Python and libraries
