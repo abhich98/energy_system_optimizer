@@ -158,6 +158,11 @@ Health check: https://esms-chft.onrender.com/health
 
 The endpoint offers 2 (FastAPI) services: 1) `POST /optimize` to run deterministic optimization with load, PV, and price forecasts as input, and 2) `POST / stochastic_optimize` to run two-stage stochastic optimization from explicit scenarios. The API accepts JSON input for battery parameters and CSV files for forecasts and scenarios. Read the [API documentation](./docs/API_README.md) for details on the input format.
 
+### Included Solvers
+These solvers are included in the Docker image and can be used via the API. The user can specify which solver to use in the `config.json` file.
+- **SCIP 9.2.0** - High-performance and fast (Apache License 2.0, recommended)
+- **GLPK** - Slower but open-source (GPL License)
+
 
 ## Future work includes:
 - Implementing and comparing different forecasting methods (e.g., LSTMs, GMMs, Markov processes) for scenario generation.

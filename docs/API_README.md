@@ -1,8 +1,12 @@
 REST API for day-ahead or long-term energy optimization with multi-battery systems, PV generation, and grid interaction.
 
+The application is live and deployed at `ESMS_URL` = https://esms-chft.onrender.com/ . Alternatively, you can run it locally using Docker or directly with Python.
+
 ## 🚀 Quick Start
 
 ### Using Docker (Recommended)
+
+Download the repository, enter the `esms` directory, and run:
 
 ```bash
 # Build and start the API
@@ -15,19 +19,11 @@ curl http://localhost:8000/health
 open http://localhost:8000/docs
 ```
 
-### Local Development
-
-```bash
-# Install dependencies
-uv sync
-
-# Run API server
-uvicorn esms.api.main:app --reload --host 0.0.0.0 --port 8000
-```
-
----
+In which case, `ESMS_URL` = http://localhost:8000/ .
 
 ## 📡 API Usage
+
+> Replace [[ESMS_URL]] with the actual URL of your choice i.e, live deployment or local instance.
 
 ### Endpoints
 
@@ -49,7 +45,7 @@ uvicorn esms.api.main:app --reload --host 0.0.0.0 --port 8000
 #### Example Request
 
 ```bash
-curl -X POST http://localhost:8000/optimize \
+curl -X POST [[ESMS_URL]]/optimize \
   -F "batteries_json=@batteries.json" \
   -F "forecasts_csv=@forecasts.csv" \
   -F "fix_decision_vars_csv=@fix_decision_vars.csv" \
@@ -69,7 +65,7 @@ files = {
     'config_json': open('config.json', 'rb')
 }
 
-response = requests.post('http://localhost:8000/optimize', files=files)
+response = requests.post(f'[[ESMS_URL]]/optimize', files=files)
 
 with open('schedule.csv', 'wb') as f:
     f.write(response.content)
@@ -86,7 +82,7 @@ with open('schedule.csv', 'wb') as f:
 #### Example Request
 
 ```bash
-curl -X POST http://localhost:8000/stochastic-optimize \
+curl -X POST [[ESMS_URL]]/stochastic-optimize \
   -F "batteries_json=@batteries.json" \
   -F "scenarios_csv=@scenarios.csv" \
   -F "ahead_prices_csv=@ahead_prices.csv" \
@@ -225,31 +221,6 @@ timestep,pv,load,price,export_price,battery_1_battery_power,battery_1_soc,grid_i
   - `soc`: State of charge (kWh)
 - Grid: `grid_import`, `grid_export` (kW)
 
----
-
-## 🐳 Docker Details
-
-### Included Solvers
-
-- **SCIP 9.2.0** - High-performance academic/non-commercial solver (recommended)
-- **GLPK**
-
-### Build Locally
-
-```bash
-docker build -t esms-optimizer .
-```
-
-### Run Container
-
-```bash
-docker run -d \
-  -p 8000:8000 \
-  --name esms-api \
-  esms-optimizer
-```
-
----
 
 ## 🧪 Testing
 
@@ -265,16 +236,13 @@ cd examples/api
 ### Manual Test
 
 ```bash
-# 1. Health check
-curl http://localhost:8000/health
-
-# 2. Run optimization
-curl -X POST http://localhost:8000/optimize \
+# 1. Run optimization
+curl -X POST [[ESMS_URL]]/optimize \
   -F "batteries_json=@examples/api/batteries.json" \
   -F "forecasts_csv=@examples/api/forecasts.csv" \
   -F "config_json=@examples/api/config.json" \
   -o schedule.csv
 
-# 3. View results
+# 2. View results
 head -20 schedule.csv
 ```
