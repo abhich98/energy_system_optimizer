@@ -12,7 +12,7 @@ Dynamic electricity tariffs allow consumers to adjust their energy consumption b
 <!-- (~30% compared to fixed tariffs [[luox](https://www.luox-energy.de/en/zuhause/dynamischer-stromtarif), [ostrom](https://www.ostrom.de/en/dynamic-pricing)]) -->
 
 <div style="text-align: center;">
-  <img src="dynamic_tariffs.png" alt="Infographic of dynamic tariffs" width="400">
+  <img src="resources/dynamic_tariffs.png" alt="Infographic of dynamic tariffs" width="400">
 </div>
 
 Although such electricity contracts are common in industrial and commercial settings, they are still relatively new to households in Germany.
@@ -91,14 +91,14 @@ $$\text{Cost Savings (\\%)} = \frac{\text{Cost}_{\text{no battery}} - \text{Cost
 **NOTE:** The implemented EMS strategy is not a full-fledged system, but only focuses on the day-ahead battery scheduling. *Ideally, the cost savings here should be evaluated against a baseline with a battery (e.g., a simple rule-based strategy) rather than the no-battery scenario, but this is left for future work.* 
 
 ### Workflow
-![Workflow image](./data_analysis_workflow_2.png)
+![Workflow image](resources/data_analysis_workflow_2.png)
 
-**NOTE:** The infographic is generated with ChatGPT. While the general workflow is correct, some details may be inaccurate. See the [scripts](./scripts/), [docs](./docs/) and the [make](./Makefile) file for the exact logic and data used in each step.
+**NOTE:** The infographic is generated with ChatGPT. While the general workflow is correct, some details may be inaccurate. See the [scripts](./scripts/), [docs](./docs/) and the [make](./Makefile) file for the exact logic, reasoning, and data used in each step.
 
 
 ## *how much money can be saved?* (Results)
 
-- Considering a household on a dynamic electricity tariff with a PV system and a BESS, the cost savings from using an EMS depend on various factors, including the size of the PV system, the capacity of the battery, etc. Read config files ([battery](./config/sonnenBatterie10.json), [optimization](./config/stochastic_optimization_config.yaml)) for the parameters used in the experiments. 
+- Considering a household on a dynamic electricity tariff with a PV system and a BESS, the cost savings from using an EMS depend on various factors, including the size of the PV system, the capacity of the battery, etc. Read config files ([battery](./config/sonnenBatterie10.json), [optimization](./config/stochastic_optimization_config.yaml)) and docs ([DECISIONS](./docs/DECISIONS.md)) for the parameters used in the experiments. 
 
 - Since the prices considered in the experiments are derived based on assumptions, the absolute cost savings (e.g., in euros) may not be meaningful. Instead, relative cost savings (e.g., percentage reduction) are presented which are more informative. **NO CLAIMS ARE MADE**.
 
