@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, Dict, Any, Tuple
+from typing import Dict, Any, Tuple
 import time
 import numpy as np
 import pandas as pd
+import logging
 
 from esms.models import Battery
 from esms.optimization import StochasticEnergyOptimizer, EnergyOptimizer
-import numpy as np
 from sklearn.metrics.pairwise import manhattan_distances
 
-import kmedoids  # type: ignore
+import kmedoids
 
 from .policies import PolicySpec
-from .metrics import DailyMetrics
+
+
+logging.getLogger("esms.optimization").setLevel(logging.WARNING)
+logging.getLogger("pyomo.core").setLevel(logging.ERROR)
 
 
 def _day_slice(frame: pd.DataFrame, day: pd.Timestamp) -> pd.DataFrame:
@@ -27,6 +29,14 @@ def _history_slice(frame: pd.DataFrame, day: pd.Timestamp, history_days: int) ->
     end = pd.Timestamp(day).normalize()
     start = end - pd.Timedelta(days=history_days)
     return frame[(frame["Date"] >= start) & (frame["Date"] < end)].copy()
+
+
+def _get_solver_args(solver_name: str) -> Dict[str, Any]:
+    """Return solver-specific arguments for Pyomo solver."""
+    if solver_name == "scip":
+        return {"solver_io": "nl"}
+    else:
+        return {}
 
 
 def generate_daily_scenarios(
@@ -54,15 +64,22 @@ def generate_daily_scenarios(
         load_distances
     )
 
+    num_scenarios = policy.num_scenarios
+    if load_hist.shape[0] < policy.num_scenarios:
+        logging.warning(
+            f"Number of history days ({load_hist.shape[0]}) is less than the number of requested scenarios ({policy.num_scenarios}). "
+            "Reducing the number of scenarios!"
+        )
+        num_scenarios = load_hist.shape[0]
     model = kmedoids.KMedoids(
-        n_clusters=policy.num_scenarios,
+        n_clusters=num_scenarios,
         metric="precomputed",
         random_state=policy.seed,
     )
     model.fit(hist_distance)
 
     medoid_indices = model.medoid_indices_
-    label_counts = np.bincount(model.labels_, minlength=policy.num_scenarios)
+    label_counts = np.bincount(model.labels_, minlength=num_scenarios)
     probabilities = label_counts / np.sum(label_counts)
 
     load_scenarios = load_hist[medoid_indices]
@@ -112,8 +129,9 @@ def run_expected_schedule(
         charge_realtime_values=np.zeros((len(batteries), policy.num_scenarios, time_points_per_day)),
         discharge_realtime_values=np.zeros((len(batteries), policy.num_scenarios, time_points_per_day)),
     )
-    res = opt.solve(solver_name=policy.solver, verbose=False)
+    res = opt.solve(solver_name=policy.solver, verbose=False, **_get_solver_args(policy.solver))
     runtime = time.time() - t0
+
     expected_df = opt.results_to_dataframe(res)
     expected_df.index = pd.to_datetime(day_df["Date"].to_numpy())
     expected_df.index.name = "Date"
@@ -130,6 +148,7 @@ def run_deterministic_schedule(
     pv = day_df["pv"].to_numpy(dtype=float)
     load = day_df["load"].to_numpy(dtype=float)
     price = day_df["import_price"].to_numpy(dtype=float)
+
     opt = EnergyOptimizer(
         batteries=batteries,
         load_forecast=load,
@@ -139,8 +158,49 @@ def run_deterministic_schedule(
     )
     t0 = time.time()
     opt.build_model()
-    res = opt.solve(solver_name="scip", verbose=False)
+    res = opt.solve(solver_name="scip", verbose=False, **_get_solver_args("scip"))
     runtime = time.time() - t0
+
+    df = opt.results_to_dataframe(res)
+    df.index = pd.to_datetime(day_df["Date"].to_numpy())
+    df.index.name = "Date"
+    return df, runtime
+
+
+def evaluate_expected_schedule(
+    day: pd.Timestamp,
+    dataset: pd.DataFrame,
+    batteries: list[Battery],
+    battery_sched: pd.DataFrame,
+    time_points_per_day: int,
+) -> Tuple[pd.DataFrame, float]:
+    day_df = _day_slice(dataset, day)
+    pv = day_df["pv"].to_numpy(dtype=float)
+    load = day_df["load"].to_numpy(dtype=float)
+    price = day_df["import_price"].to_numpy(dtype=float)
+
+    # Schedule values for battery charge/discharge
+    bess_charge_values = np.zeros((len(batteries), time_points_per_day))
+    bess_discharge_values = np.zeros((len(batteries), time_points_per_day))
+    for b_idx, battery in enumerate(batteries):
+        bess_charge_values[b_idx, :] = battery_sched[f"{battery.id}_charge_ahead"].to_numpy(dtype=float)
+        bess_discharge_values[b_idx, :] = battery_sched[f"{battery.id}_discharge_ahead"].to_numpy(dtype=float)
+
+    opt = EnergyOptimizer(
+        batteries=batteries,
+        load_forecast=load,
+        pv_forecast=pv,
+        import_price_forecast=price,
+        timestep_hours=float(24 / time_points_per_day),
+    )
+    t0 = time.time()
+    opt.build_model(
+        charge_values=np.clip(bess_charge_values, 0, None),
+        discharge_values=np.clip(bess_discharge_values, 0, None),
+    )
+    res = opt.solve(solver_name="scip", verbose=False, **_get_solver_args("scip"))
+    runtime = time.time() - t0
+
     df = opt.results_to_dataframe(res)
     df.index = pd.to_datetime(day_df["Date"].to_numpy())
     df.index.name = "Date"

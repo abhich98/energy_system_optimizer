@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass, asdict
-from typing import List, Tuple, Dict, Any
+from typing import Tuple
 import pandas as pd
 
 
@@ -24,7 +23,9 @@ def make_noncontiguous_holdout(
     return holdout, backtest
 
 
-def persist_split(holdout: pd.DatetimeIndex, backtest: pd.DatetimeIndex, out_dir: str) -> None:
+def persist_split(
+    holdout: pd.DatetimeIndex, backtest: pd.DatetimeIndex, out_dir: str
+) -> None:
     from pathlib import Path
 
     p = Path(out_dir)

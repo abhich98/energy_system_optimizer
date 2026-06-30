@@ -5,6 +5,7 @@ YEAR := 2025
 GROUND_TRUTH_FILE := $(DATA_DIR)/Dataset_v$(DATASET_VERSION).xlsx
 
 CONFIG_DIR := ./config
+SPLIT_DATA_CONFIG_FILE := $(CONFIG_DIR)/data_split.yaml
 STOCHASTIC_OPTIMIZATION_CONFIG_FILE := $(CONFIG_DIR)/stochastic_optimization_config.yaml
 BESS_FILE := $(CONFIG_DIR)/sonnenBatterie10.json
 
@@ -22,14 +23,28 @@ endif
 
 export
 
-.PHONY: app all
+.PHONY: app all challenge old
 
 app: 
-	$(PYTHON) -m streamlit run ./app/main.py
+	$(PYTHON) -m streamlit run ./app/main_scheduling.py
 
-all: \
+all: \ 
+	$(GROUND_TRUTH_FILE) \
+	$(GENERATED_DATA_DIR)/holdout_days.csv $(GENERATED_DATA_DIR)/backtest_days.csv \
+	challenge
+
+$(GROUND_TRUTH_FILE): $(SCRIPTS_DIR)/data_preparation.py $(CONFIG_DIR)/data_preparation_config.yaml 
+	$(PYTHON) $< --config $(CONFIG_DIR)/data_preparation_config.yaml
+
+$(GENERATED_DATA_DIR)/holdout_days.csv $(GENERATED_DATA_DIR)/backtest_days.csv: $(SCRIPTS_DIR)/split_holdout.py $(GROUND_TRUTH_FILE) $(SPLIT_DATA_CONFIG_FILE)
+	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --year $(YEAR) --config_file $(SPLIT_DATA_CONFIG_FILE)
+
+challenge: $(SCRIPTS_DIR)/evaluate_policies.py $(GROUND_TRUTH_FILE) $(BESS_FILE) $(CONFIG_DIR)/challengers.json $(GENERATED_DATA_DIR)/holdout_days.csv
+	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --year $(YEAR) --battery_file $(BESS_FILE) --holdout_csv $(GENERATED_DATA_DIR)/holdout_days.csv --challengers_json $(CONFIG_DIR)/challengers.json --out_dir $(GENERATED_DATA_DIR)/eval/  
+
+
+old: \
 	$(GENERATED_DATA_DIR)/perfect_foresight_optimization_$(YEAR).csv \
-	$(GENERATED_DATA_DIR)/simulated_rt_prices_$(YEAR).csv \
 	$(GENERATED_DATA_DIR)/stochastic_optimization_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv \
 	$(GENERATED_DATA_DIR)/stochastic_policy_evaluation_with_$(STOC_OP_SCENARIOS)_scenarios_$(YEAR).csv
 
