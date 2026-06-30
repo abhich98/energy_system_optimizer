@@ -87,7 +87,7 @@ def main() -> None:
             "Champion policy file %s does not exist; using default champion spec",
             args.champion_json,
         )
-        champ_spec = PolicySpec(id="champion_default", history_days=3, num_scenarios=3)
+        champ_spec = PolicySpec(id="champion_default", history_days=1, num_scenarios=1, pv_coeff=0.5, load_coeff=0.5, seed=3)
 
     # challengers
     clist = [PolicySpec(**d) for d in json.loads(args.challengers_json.read_text())]

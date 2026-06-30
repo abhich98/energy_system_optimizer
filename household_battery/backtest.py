@@ -14,7 +14,6 @@ import kmedoids
 
 from .policies import PolicySpec
 
-
 logging.getLogger("esms.optimization").setLevel(logging.WARNING)
 logging.getLogger("pyomo.core").setLevel(logging.ERROR)
 
@@ -25,7 +24,9 @@ def _day_slice(frame: pd.DataFrame, day: pd.Timestamp) -> pd.DataFrame:
     return frame[(frame["Date"] >= start) & (frame["Date"] <= end)].copy()
 
 
-def _history_slice(frame: pd.DataFrame, day: pd.Timestamp, history_days: int) -> pd.DataFrame:
+def _history_slice(
+    frame: pd.DataFrame, day: pd.Timestamp, history_days: int
+) -> pd.DataFrame:
     end = pd.Timestamp(day).normalize()
     start = end - pd.Timedelta(days=history_days)
     return frame[(frame["Date"] >= start) & (frame["Date"] < end)].copy()
@@ -45,24 +46,19 @@ def generate_daily_scenarios(
     time_points_per_day: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     load_hist = (
-        history_df["load"]
-        .to_numpy(dtype=float)
-        .reshape(-1, time_points_per_day)
+        history_df["load"].to_numpy(dtype=float).reshape(-1, time_points_per_day)
     )
-    pv_hist = (
-        history_df["pv"]
-        .to_numpy(dtype=float)
-        .reshape(-1, time_points_per_day)
-    )
+    pv_hist = history_df["pv"].to_numpy(dtype=float).reshape(-1, time_points_per_day)
 
     def _normalized(m: np.ndarray) -> np.ndarray:
         mx = float(np.max(m))
         return np.zeros_like(m) if np.isclose(mx, 0.0) else (m / mx)
+
     pv_distances = manhattan_distances(pv_hist)
     load_distances = manhattan_distances(load_hist)
-    hist_distance = policy.pv_coeff * _normalized(pv_distances) + policy.load_coeff * _normalized(
-        load_distances
-    )
+    hist_distance = policy.pv_coeff * _normalized(
+        pv_distances
+    ) + policy.load_coeff * _normalized(load_distances)
 
     num_scenarios = policy.num_scenarios
     if load_hist.shape[0] < policy.num_scenarios:
@@ -102,7 +98,9 @@ def run_expected_schedule(
     day_df = _day_slice(dataset, day)
     hist_df = _history_slice(dataset, day, policy.history_days)
 
-    load_scen, pv_scen, probs = generate_daily_scenarios(policy, hist_df, time_points_per_day)
+    load_scen, pv_scen, probs = generate_daily_scenarios(
+        policy, hist_df, time_points_per_day
+    )
 
     import_price_rt_day = day_df["import_price"].to_numpy(dtype=float)
     import_price_rt = np.tile(import_price_rt_day, (policy.num_scenarios, 1))
@@ -126,10 +124,16 @@ def run_expected_schedule(
     opt.build_model(
         grid_import_ahead_values=np.zeros(time_points_per_day),
         grid_export_ahead_values=np.zeros(time_points_per_day),
-        charge_realtime_values=np.zeros((len(batteries), policy.num_scenarios, time_points_per_day)),
-        discharge_realtime_values=np.zeros((len(batteries), policy.num_scenarios, time_points_per_day)),
+        charge_realtime_values=np.zeros(
+            (len(batteries), policy.num_scenarios, time_points_per_day)
+        ),
+        discharge_realtime_values=np.zeros(
+            (len(batteries), policy.num_scenarios, time_points_per_day)
+        ),
     )
-    res = opt.solve(solver_name=policy.solver, verbose=False, **_get_solver_args(policy.solver))
+    res = opt.solve(
+        solver_name=policy.solver, verbose=False, **_get_solver_args(policy.solver)
+    )
     runtime = time.time() - t0
 
     expected_df = opt.results_to_dataframe(res)
@@ -183,8 +187,12 @@ def evaluate_expected_schedule(
     bess_charge_values = np.zeros((len(batteries), time_points_per_day))
     bess_discharge_values = np.zeros((len(batteries), time_points_per_day))
     for b_idx, battery in enumerate(batteries):
-        bess_charge_values[b_idx, :] = battery_sched[f"{battery.id}_charge_ahead"].to_numpy(dtype=float)
-        bess_discharge_values[b_idx, :] = battery_sched[f"{battery.id}_discharge_ahead"].to_numpy(dtype=float)
+        bess_charge_values[b_idx, :] = battery_sched[
+            f"{battery.id}_charge_ahead"
+        ].to_numpy(dtype=float)
+        bess_discharge_values[b_idx, :] = battery_sched[
+            f"{battery.id}_discharge_ahead"
+        ].to_numpy(dtype=float)
 
     opt = EnergyOptimizer(
         batteries=batteries,

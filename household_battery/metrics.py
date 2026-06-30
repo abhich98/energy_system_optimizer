@@ -24,7 +24,9 @@ def aggregate_metrics(rows: list[DailyMetrics]) -> Dict[str, Any]:
     return {
         "days": int(frame.shape[0]),
         "mean_total_cost": float(frame.total_cost.mean()),
-        "p95_runtime_sec": float(np.percentile(frame.runtime_sec, 95)) if len(frame) else 0.0,
+        "p95_runtime_sec": (
+            float(np.percentile(frame.runtime_sec, 95)) if len(frame) else 0.0
+        ),
         "violations_sum": int(frame.violations.sum()),
         "win_rate_vs_champion": None,  # to be filled by selection logic when comparing
     }
