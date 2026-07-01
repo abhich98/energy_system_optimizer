@@ -1,0 +1,9 @@
+{
+  "id": "policy_002",
+  "history_days": 10,
+  "num_scenarios": 5,
+  "pv_coeff": 0.7,
+  "load_coeff": 0.3,
+  "solver": "scip",
+  "seed": 42
+}

@@ -1,5 +1,0 @@
-{
-  "solver": "scip",
-  "timestep_hours": 1.0,
-  "verbose": false
-}
