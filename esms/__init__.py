@@ -7,7 +7,7 @@ from .optimization import EnergyOptimizer, StochasticEnergyOptimizer
 from .utils import SUGGESTED_SOLVERS, get_available_pyomo_solvers, build_batteries
 
 try:
-    __version__ = version("esms")
+    __version__ = "0.2.0"
 except PackageNotFoundError:
     __version__ = "dev"  # Fallback for development
 

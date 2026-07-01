@@ -1,11 +1,9 @@
-version: '3.8'
-
 services:
-  esms-api:
+  household-battery-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: esms-optimizer
+    container_name: energy-system-optimizer
     ports:
       - "8000:8000"
     environment:

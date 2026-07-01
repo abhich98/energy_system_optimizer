@@ -31,14 +31,17 @@ RUN glpsol --version
 RUN pip install --no-cache-dir uv
 
 # Copy dependency files
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml ./
 
 # Copy application code and metadata
 COPY README.md ./
+COPY docs/API_README.md ./
 COPY esms/ esms/
+COPY household_battery/ household_battery/
+COPY artifacts/ artifacts/
 
 # Install Python dependencies
-RUN uv pip install --system --no-cache -e .
+RUN uv pip install --system --no-cache .
 
 # Expose API port
 EXPOSE 8000
@@ -48,4 +51,4 @@ ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=INFO
 
 # Run FastAPI server
-CMD ["uvicorn", "esms.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "household_battery.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
