@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "energy-system-optimizer"
-version = "0.2.0"
+version = "0.3.0"
 description = "Energy optimization using Pyomo + FastAPI for household battery scheduling"
 readme = "README.md"
 requires-python = ">=3.11,<=3.14"

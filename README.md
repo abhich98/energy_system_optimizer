@@ -62,10 +62,9 @@ The optimization engine is adapted for the use-case of household battery dispatc
 
 Live API: https://esms-chft.onrender.com/
 
-Streamlit frontend: 
+Streamlit frontend: https://esms-house-battery-schedule.streamlit.app/
 
 ![Frontend Screenshot](./resources/streamlit_frontend.png)
-
 
 
 ### 3) Study scope and evaluation

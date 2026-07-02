@@ -91,7 +91,7 @@ For complete contract details: [docs/API_README.md](docs/API_README.md)
 
 ## Streamlit frontend
 
-Live frontend: `https://esms-chft.onrender.com`
+Live frontend: `https://esms-house-battery-schedule.streamlit.app/`
 
 Run locally:
 
