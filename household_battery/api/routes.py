@@ -129,6 +129,84 @@ def dayahead_stochastic(req: StochasticRequest):
         )
 
 
+@router.post("/dayahead/stochastic/upload")
+async def dayahead_stochastic_upload(
+    batteries_json: UploadFile = File(
+        ..., description="Battery configuration JSON file"
+    ),
+    history_csv: UploadFile = File(..., description="History CSV file"),
+    ahead_prices_csv: UploadFile = File(..., description="Ahead prices CSV file"),
+    policy_override_json: UploadFile | None = File(
+        None, description="Optional policy override JSON file"
+    ),
+    timestep_hours: float | None = Form(None),
+):
+    try:
+        batteries_text = (await batteries_json.read()).decode("utf-8")
+        history_text = (await history_csv.read()).decode("utf-8")
+        ahead_prices_text = (await ahead_prices_csv.read()).decode("utf-8")
+
+        batteries_payload = json.loads(batteries_text)
+
+        policy_override_payload = None
+        if policy_override_json is not None:
+            policy_override_text = (await policy_override_json.read()).decode("utf-8").strip()
+            if policy_override_text:
+                policy_override_payload = json.loads(policy_override_text)
+
+        req = StochasticRequest(
+            batteries=batteries_payload,
+            history_csv=history_text,
+            ahead_prices_csv=ahead_prices_text,
+            policy_override=policy_override_payload,
+            timestep_hours=timestep_hours,
+        )
+
+        df = run_dayahead_stochastic(
+            batteries_specs=[b.model_dump() for b in req.batteries],
+            history_csv_text=req.history_csv,
+            ahead_prices_csv_text=req.ahead_prices_csv,
+            policy_override=(
+                req.policy_override.model_dump() if req.policy_override else None
+            ),
+            champion_path=str(CHAMPION_POLICY_PATH),
+            timestep_hours=req.timestep_hours,
+        )
+
+        csv_bytes = df.to_csv(index=False).encode("utf-8")
+        return StreamingResponse(
+            io.BytesIO(csv_bytes),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=dayahead_stochastic_schedule.csv"
+            },
+        )
+
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid JSON file for batteries or policy override.",
+        )
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=400, detail="Uploaded files must be UTF-8 text."
+        )
+    except DataValidationError as e:
+        logger.error("Stochastic upload validation error: %s", str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError:
+        logger.error("Champion policy file missing")
+        raise HTTPException(
+            status_code=503, detail="Champion policy is not configured on the server."
+        )
+    except Exception as e:
+        logger.exception("Stochastic upload scheduling failed")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid upload request or scheduling failed. Please verify inputs and champion policy.",
+        )
+
+
 @router.get("/health")
 def health():
     """Basic health and solver availability check."""

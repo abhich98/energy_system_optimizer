@@ -6,7 +6,7 @@ from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
-API_BASE = ""
+API_BASE = "http://localhost:8000"
 DETERM_ENDPOINT = f"{API_BASE}/dayahead/deterministic"
 STOCH_ENDPOINT = f"{API_BASE}/dayahead/stochastic"
 

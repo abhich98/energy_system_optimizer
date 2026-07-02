@@ -12,15 +12,17 @@ from household_battery.api.models import (
     StochasticRequest,
 )
 
-if False:  # Set to True to use the real API instead of the test client
-    import requests
-else:
+
+LOCAL_TESTING = False  # Set to True for local testing without API calls
+if LOCAL_TESTING:
     from fastapi.testclient import TestClient
 
     from household_battery.api.main import app
 
     requests = TestClient(app)  # type: ignore
     API_BASE = ""
+    DETERM_ENDPOINT = f"{API_BASE}/dayahead/deterministic"
+    STOCH_ENDPOINT = f"{API_BASE}/dayahead/stochastic"
 
 
 def get_available_solvers() -> list[str]:
