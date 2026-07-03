@@ -309,9 +309,9 @@ class OptimizationCostCalculator:
         work_df["total_cost"] = work_df["net_energy_cost"]
 
         # Battery degradation costs
+        battery_cols = []
         if battery_file is not None:
             degradation_costs = self._load_battery_degradation_map(battery_file)
-            battery_cols = []
             for battery_id, deg_cost in degradation_costs.items():
                 charge_col = f"{battery_id}_charge"
                 discharge_col = f"{battery_id}_discharge"
@@ -357,7 +357,7 @@ def calculate_final_cost(
     optimization_result_file: str | Path,
     battery_file: str | Path,
     dt_hours: float,
-    mode: str = "auto",
+    mode: str = "deterministic",
 ) -> dict[str, Any]:
     """Convenience function returning a dictionary cost breakdown."""
     calculator = OptimizationCostCalculator(dt_hours=dt_hours)

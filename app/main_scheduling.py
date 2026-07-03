@@ -8,7 +8,7 @@ from scheduling_ui import apply_theme_and_header
 def _render_instructions() -> None:
     with st.expander("Instructions", expanded=False):
         st.markdown("""
-            - For household battery scheduling, provide PV generation, load, electricity price data, and battery specifications.
+            - For household battery scheduling, provide PV generation, load (consumption), electricity price data, and battery specifications.
             - Under *dynamic* electricity pricing, the prices are tied to EPEX spot day-ahead market prices. The electricity provider informs the household of the next day's prices. If you have a general *fixed tariff* contract, provide the value from your contract.
             - It is assumed that provided data has following units: PV generation and load are in kW (kilowatts); prices are in EUR/kWh.
 

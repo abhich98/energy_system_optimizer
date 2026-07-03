@@ -28,13 +28,8 @@ export
 app: 
 	$(PYTHON) -m streamlit run ./app/main_scheduling.py
 
-all: \ 
-	$(GROUND_TRUTH_FILE) \
-	$(GENERATED_DATA_DIR)/holdout_days.csv $(GENERATED_DATA_DIR)/backtest_days.csv \
-	challenge
-
-$(GROUND_TRUTH_FILE): $(SCRIPTS_DIR)/data_preparation.py $(CONFIG_DIR)/data_preparation_config.yaml 
-	$(PYTHON) $< --config $(CONFIG_DIR)/data_preparation_config.yaml
+# $(GROUND_TRUTH_FILE): $(SCRIPTS_DIR)/data_preparation.py $(CONFIG_DIR)/data_preparation_config.yaml 
+# 	$(PYTHON) $< --config $(CONFIG_DIR)/data_preparation_config.yaml
 
 $(GENERATED_DATA_DIR)/holdout_days.csv $(GENERATED_DATA_DIR)/backtest_days.csv: $(SCRIPTS_DIR)/split_holdout.py $(GROUND_TRUTH_FILE) $(SPLIT_DATA_CONFIG_FILE)
 	$(PYTHON) $< --data_file $(GROUND_TRUTH_FILE) --year $(YEAR) --config_file $(SPLIT_DATA_CONFIG_FILE)
