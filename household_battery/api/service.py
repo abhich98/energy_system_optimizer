@@ -8,7 +8,7 @@ from typing import List
 import pandas as pd
 
 from esms.models import Battery
-from household_battery.backtest import run_deterministic_schedule, run_expected_schedule
+from household_battery.schedule import run_deterministic_schedule, run_expected_schedule
 from household_battery.policies import PolicySpec, load_champion_local
 
 from .errors import DataValidationError

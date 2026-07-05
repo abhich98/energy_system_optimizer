@@ -13,7 +13,7 @@ workflow glue here.
 __all__ = [
     "policies",
     "split",
-    "backtest",
+    "schedule",
     "metrics",
     "selection",
 ]

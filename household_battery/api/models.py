@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -31,5 +31,5 @@ class StochasticRequest(BaseModel):
     ahead_prices_csv: str = Field(
         ..., description="CSV content with next-day ahead prices as text"
     )
-    policy_override: Optional[ChampionPolicy] = None
+    policy_override: Optional[Dict] = None
     timestep_hours: Optional[float] = None

@@ -35,11 +35,10 @@ def dayahead_deterministic(req: DeterministicRequest):
         return JSONResponse(content=df.to_dict(orient="list"))
     except DataValidationError as e:
         # Data/format validation errors should be returned to the client
-        logger.error("Deterministic scheduling validation error: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         # Log internally at info level without stack trace leakage to clients
-        logger.exception("Deterministic scheduling failed")
+        logger.exception("Deterministic scheduling failed, error: %s", str(e))
         raise HTTPException(
             status_code=400,
             detail="Invalid request or scheduling failed. Please verify inputs.",
@@ -88,10 +87,9 @@ async def dayahead_deterministic_upload(
             status_code=400, detail="Uploaded files must be UTF-8 text."
         )
     except DataValidationError as e:
-        logger.error("Deterministic upload validation error: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.exception("Deterministic upload scheduling failed")
+        logger.exception("Deterministic upload scheduling failed, error: %s", str(e))
         raise HTTPException(
             status_code=400,
             detail="Invalid upload request or scheduling failed. Please verify inputs.",
@@ -105,24 +103,20 @@ def dayahead_stochastic(req: StochasticRequest):
             batteries_specs=[b.model_dump() for b in req.batteries],
             history_csv_text=req.history_csv,
             ahead_prices_csv_text=req.ahead_prices_csv,
-            policy_override=(
-                req.policy_override.model_dump() if req.policy_override else None
-            ),
+            policy_override=req.policy_override,
             champion_path=str(CHAMPION_POLICY_PATH),
             timestep_hours=req.timestep_hours,
         )
         df["Date"] = df["Date"].dt.strftime("%Y-%m-%d %H:%M:%S")
         return JSONResponse(content=df.to_dict(orient="list"))
     except DataValidationError as e:
-        logger.error("Stochastic scheduling validation error: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:
-        logger.error("Champion policy file missing")
         raise HTTPException(
             status_code=503, detail="Champion policy is not configured on the server."
         )
     except Exception as e:
-        logger.exception("Stochastic scheduling failed")
+        logger.exception("Stochastic scheduling failed, error: %s", str(e))
         raise HTTPException(
             status_code=400,
             detail="Invalid request or scheduling failed. Please verify inputs and champion policy.",
@@ -166,9 +160,7 @@ async def dayahead_stochastic_upload(
             batteries_specs=[b.model_dump() for b in req.batteries],
             history_csv_text=req.history_csv,
             ahead_prices_csv_text=req.ahead_prices_csv,
-            policy_override=(
-                req.policy_override.model_dump() if req.policy_override else None
-            ),
+            policy_override=req.policy_override,
             champion_path=str(CHAMPION_POLICY_PATH),
             timestep_hours=req.timestep_hours,
         )
@@ -192,15 +184,13 @@ async def dayahead_stochastic_upload(
             status_code=400, detail="Uploaded files must be UTF-8 text."
         )
     except DataValidationError as e:
-        logger.error("Stochastic upload validation error: %s", str(e))
         raise HTTPException(status_code=400, detail=str(e))
     except FileNotFoundError:
-        logger.error("Champion policy file missing")
         raise HTTPException(
             status_code=503, detail="Champion policy is not configured on the server."
         )
     except Exception as e:
-        logger.exception("Stochastic upload scheduling failed")
+        logger.exception("Stochastic upload scheduling failed, error: %s", str(e))
         raise HTTPException(
             status_code=400,
             detail="Invalid upload request or scheduling failed. Please verify inputs and champion policy.",
