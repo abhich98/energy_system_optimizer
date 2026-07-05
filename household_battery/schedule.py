@@ -12,6 +12,8 @@ from sklearn.metrics.pairwise import manhattan_distances
 
 import kmedoids
 
+from esms.utils import get_available_pyomo_solvers
+
 from .policies import PolicySpec
 
 logging.getLogger("esms.optimization").setLevel(logging.WARNING)
@@ -38,6 +40,18 @@ def _get_solver_args(solver_name: str) -> Dict[str, Any]:
         return {"solver_io": "nl"}
     else:
         return {}
+
+
+def _verify_solver_availability(solver_name: str) -> str:
+    """Check if the specified solver is available, and return a valid solver name."""
+    available_solvers = get_available_pyomo_solvers()
+    if solver_name in available_solvers:
+        return solver_name
+    else:
+        logging.warning(
+            f"Solver '{solver_name}' is not available. Falling back to 'glpk'."
+        )
+        return "glpk"
 
 
 def generate_daily_scenarios(
@@ -130,8 +144,10 @@ def run_expected_schedule(
             (len(batteries), policy.num_scenarios, time_points_per_day)
         ),
     )
+
+    solver_to_use = _verify_solver_availability(policy.solver)
     res = opt.solve(
-        solver_name=policy.solver, verbose=False, **_get_solver_args(policy.solver)
+        solver_name=solver_to_use, verbose=False, **_get_solver_args(solver_to_use)
     )
     runtime = time.time() - t0
 
@@ -161,8 +177,10 @@ def run_deterministic_schedule(
     )
     t0 = time.time()
     opt.build_model()
-    res = opt.solve(solver_name="scip", verbose=False, **_get_solver_args("scip"))
+
     runtime = time.time() - t0
+    solver_to_use = _verify_solver_availability("scip")
+    res = opt.solve(solver_name=solver_to_use, verbose=False, **_get_solver_args(solver_to_use))
 
     df = opt.results_to_dataframe(res)
     df.index = pd.to_datetime(day_df["Date"].to_numpy())
@@ -205,7 +223,9 @@ def evaluate_expected_schedule(
         charge_values=np.clip(bess_charge_values, 0, None),
         discharge_values=np.clip(bess_discharge_values, 0, None),
     )
-    res = opt.solve(solver_name="scip", verbose=False, **_get_solver_args("scip"))
+
+    solver_to_use = _verify_solver_availability("scip")
+    res = opt.solve(solver_name=solver_to_use, verbose=False, **_get_solver_args(solver_to_use))
     runtime = time.time() - t0
 
     df = opt.results_to_dataframe(res)

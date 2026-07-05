@@ -95,6 +95,7 @@ def test_stochastic_json_and_upload_return_same_battery_schedule_with_override()
     policy_override = {
         "history_days": 3,
         "num_scenarios": 3,
+        "solver": "glpk",
     }
 
     json_payload = {
