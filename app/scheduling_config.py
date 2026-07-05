@@ -24,3 +24,15 @@ def load_json_file(path: Path) -> Any:
 
 DEFAULT_BATTERY_VALUES_DICT = load_json_file(SAMPLE_SINGLE_BATTERY_PATH)[0]
 DEFAULT_SOLVER_OPTS_DICT = {"timestep_hours": 1.0}
+
+OPEN_SOURCE_DATASET_PATH = (
+    ROOT_DIR / "data" / "data_household_germany" / "Dataset_v1.2.0.xlsx"
+)
+OPEN_SOURCE_SHEET = 0
+OPEN_SOURCE_DATE_COL = "Date"
+OPEN_SOURCE_PV_COL = "PV generation (kW)"
+OPEN_SOURCE_LOAD_COL = "Consumption (kW)"
+OPEN_SOURCE_PRICE_COL = "Energy price (EUR/kWh)"
+OPEN_SOURCE_START_MONTH = 4
+OPEN_SOURCE_END_MONTH = 12
+OPEN_SOURCE_DEFAULT_HISTORY_DAYS = 3

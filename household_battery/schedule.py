@@ -62,11 +62,10 @@ def generate_daily_scenarios(
 
     num_scenarios = policy.num_scenarios
     if load_hist.shape[0] < policy.num_scenarios:
-        logging.warning(
-            f"Number of history days ({load_hist.shape[0]}) is less than the number of requested scenarios ({policy.num_scenarios}). "
-            "Reducing the number of scenarios!"
+        raise ValueError(
+            f"Number of history days ({load_hist.shape[0]}) is less than the number of requested scenarios ({policy.num_scenarios})."
         )
-        num_scenarios = load_hist.shape[0]
+
     model = kmedoids.KMedoids(
         n_clusters=num_scenarios,
         metric="precomputed",

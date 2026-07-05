@@ -20,7 +20,7 @@ def main() -> None:
     apply_theme_and_header()
     _render_instructions()
 
-    st.markdown("**Try one of the two approaches:**")
+    st.markdown("**Try one of the two approaches or explore open-source data:**")
 
     # Future extension point:
     # Add top-level home routing here (e.g., Open-source exploration page vs Scheduling page).

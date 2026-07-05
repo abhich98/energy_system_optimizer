@@ -285,6 +285,11 @@ def apply_theme_and_header() -> None:
             [data-testid="stSidebarNav"] {
                 background: transparent;
             }
+            [data-testid="stMainBlockContainer"],
+            [data-testid="stAppViewContainer"] .main .block-container,
+            section.main > div.block-container {
+                padding-top: 2.0rem !important;
+            }
             main, section, article, div[data-testid="stVerticalBlock"], div[data-testid="stHorizontalBlock"] {
                 color: #f8fafc;
             }
@@ -338,6 +343,7 @@ def apply_theme_and_header() -> None:
                 color: #ffffff;
                 text-align: center;
                 box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+                margin-top: 0;
             }
             .app-header h1 { color: #ffffff !important; font-size: 2.0rem; margin: 0; }
             .app-header p { margin: 8px 0 0 0; color: #e2e8f0; font-weight: 600; }
@@ -348,8 +354,8 @@ def apply_theme_and_header() -> None:
     st.markdown(
         """
         <div class="app-header">
-            <h1>Household Battery Scheduling</h1>
-            <p>Obtain day-ahead (next day's) schedule for your household battery/BESS.</p>
+            <h1>🔋 Household Battery Scheduling</h1>
+            <p>Obtain day-ahead (next day's) schedule for your household battery/BESS -- <i>when to charge and when not to.</i></p>
         </div>
         """,
         unsafe_allow_html=True,

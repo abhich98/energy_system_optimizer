@@ -13,7 +13,7 @@ from household_battery.api.models import (
 )
 
 
-LOCAL_TESTING = False  # Set to True for local testing without API calls
+LOCAL_TESTING = True  # Set to True for local testing without API calls
 if LOCAL_TESTING:
     from fastapi.testclient import TestClient
 
@@ -74,12 +74,11 @@ def call_stochastic_api(
     policy_override: Optional[dict[str, Any]],
     timestep_hours: Optional[float],
 ) -> pd.DataFrame:
-    override_model = ChampionPolicy(**policy_override) if policy_override else None
     request_model = StochasticRequest(
         batteries=batteries,
         history_csv=history_df.to_csv(index=False),
         ahead_prices_csv=ahead_df.to_csv(index=False),
-        policy_override=override_model,
+        policy_override=policy_override,
         timestep_hours=timestep_hours,
     )
     payload = request_model.model_dump(exclude_none=True)
