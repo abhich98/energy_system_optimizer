@@ -49,7 +49,9 @@ def run_dayahead_deterministic(
                 "timestep_hours must be provided if 'Date' column is missing"
             )
         df["Date"] = pd.date_range(
-            start="2026-01-01", periods=len(df), freq=f"{timestep_hours}h"
+            # Assuming the forecasts are for the next day, we start from tomorrow's date at midnight
+            start=pd.Timestamp.now().normalize() + pd.Timedelta(days=1), 
+            periods=len(df), freq=f"{timestep_hours}h"
         )
 
     T = int(round(24.0 / timestep_hours))
@@ -109,8 +111,8 @@ def run_dayahead_stochastic(
             raise DataValidationError(
                 "timestep_hours must be provided if 'Date' column is missing in history or ahead prices"
             )
-        # Build ahead starting at a fixed anchor, and history ending just before it
-        ahead_start = pd.Timestamp("2026-01-01 00:00:00")
+        # Build ahead starting at a fixed anchor that is the next day at midnight, and history preceding it
+        ahead_start = pd.Timestamp.now().normalize() + pd.Timedelta(days=1)
         freq = pd.to_timedelta(f"{timestep_hours}h")
         ahead["Date"] = pd.date_range(start=ahead_start, periods=len(ahead), freq=freq)
         hist_end = ahead_start - freq

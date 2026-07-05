@@ -13,7 +13,7 @@ from household_battery.api.models import (
 )
 
 
-LOCAL_TESTING = True  # Set to True for local testing without API calls
+LOCAL_TESTING = False  # Set to True for local testing without API calls
 if LOCAL_TESTING:
     from fastapi.testclient import TestClient
 

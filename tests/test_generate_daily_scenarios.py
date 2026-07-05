@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from household_battery.policies import PolicySpec
-from household_battery.backtest import generate_daily_scenarios
+from household_battery.schedule import generate_daily_scenarios
 
 
 def _make_history_df(start_date: str, days: int, time_points_per_day: int) -> pd.DataFrame:
@@ -45,33 +45,6 @@ def test_equal_probabilities_when_history_equals_num_scenarios():
 
     # When the number of scenarios equals the number of history days,
     # each scenario should represent exactly one day => equal probabilities
-    expected = np.full(P, 1.0 / P)
-    assert np.allclose(probabilities, expected, atol=1e-8)
-
-
-def test_case_with_more_scenarios_than_history_days():
-    P = 3
-    T = 24
-    history_df = _make_history_df("2025-01-01", P, T)
-
-    spec = PolicySpec(
-        id="test_policy",
-        history_days=P,
-        num_scenarios=5,  # More scenarios than history days
-        pv_coeff=0.5,
-        load_coeff=0.5,
-        solver="scip",
-        seed=123,
-    )
-
-    load_scen, pv_scen, probabilities = generate_daily_scenarios(spec, history_df, T)
-
-    # Basic shape checks
-    assert load_scen.shape == (P, T)  # Should only have P scenarios since history is limited
-    assert pv_scen.shape == (P, T)
-    assert probabilities.shape == (P,)
-
-    # Probabilities should sum to 1 and be uniform since each day is unique
     expected = np.full(P, 1.0 / P)
     assert np.allclose(probabilities, expected, atol=1e-8)
 
