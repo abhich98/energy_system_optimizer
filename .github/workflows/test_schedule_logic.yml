@@ -1,23 +1,18 @@
-name: Test Optimizers
+name: Test Scheduling Logic
 
 on:
-  push:
-    branches: [main, dev]
-    paths:
-      - "esms/**"
-      - "tests/test_deterministic_optimizer.py"
-      - "tests/test_stochastic_optimizer.py"
+    push:
+        branches: [main, dev]
+        paths:
+        - "household_battery/*.py"
+        - "config/**"
+        - "tests/test_scheduling_logic.py"
 
 jobs:
-    test_optimizers:
+    test_scheduling_logic:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-
-            - name: Install glpk
-              run: |
-                sudo apt-get update
-                sudo apt-get install -y glpk-utils
 
             - name: Set up Python
               uses: actions/setup-python@v4
@@ -33,5 +28,4 @@ jobs:
             - name: Run tests
               run: |
                 source .venv/bin/activate
-                pytest tests/test_deterministic_optimizer.py -v -s
-                pytest tests/test_stochastic_optimizer.py -v -s
+                pytest tests/test_generate_daily_scenarios.py -v -s

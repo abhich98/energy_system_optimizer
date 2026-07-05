@@ -1,23 +1,19 @@
-name: Test Optimizers
+name: Test APIs
 
 on:
-  push:
-    branches: [main, dev]
-    paths:
-      - "esms/**"
-      - "tests/test_deterministic_optimizer.py"
-      - "tests/test_stochastic_optimizer.py"
+    push:
+        branches: [main, dev]
+        paths:
+        - "household_battery/api/**"
+        - "artifacts/**"
+        - "tests/test_api_routes.py"
+        - "tests/test_api_parity_from_files.py"
 
 jobs:
-    test_optimizers:
+    test_apis:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-
-            - name: Install glpk
-              run: |
-                sudo apt-get update
-                sudo apt-get install -y glpk-utils
 
             - name: Set up Python
               uses: actions/setup-python@v4
@@ -33,5 +29,5 @@ jobs:
             - name: Run tests
               run: |
                 source .venv/bin/activate
-                pytest tests/test_deterministic_optimizer.py -v -s
-                pytest tests/test_stochastic_optimizer.py -v -s
+                pytest tests/test_api_routes.py -v -s
+                pytest tests/test_api_parity_from_files.py -v -s
