@@ -7,4 +7,8 @@
 
 - [x] Use the household dataset from [Germany](../resources/s41597-022-01156-1.pdf) and implement the entire EMS pipeline and perform analysis similar to Rezaeimozafar et al. (2024) [paper](../resources/1-s2.0-S235248472400372X-main.pdf).
 
-- [] Currently, I am running optimization for a single day, and considering that each day is independent and starts at the same initial soc. This is problematic because it does not capture the inter-day dependencies. 
+- [] Currently, I am running optimization for a single day, and considering that each day is independent and starts at the same initial soc. This is problematic because it does not capture the inter-day dependencies.
+
+- [x] Reorganize the project into the optimization backend (Python package), and a use-case API specific to day-ahed battery scheduling in households. The stremlit frontend should allow users to select the optimization approach, and visualize the results for the use-case.
+
+- [] Test functions to check the upload APIs are providing the same results as the JSON-body APIs. Test functions should also check that the deterministic results match the stochastic results when all the past scenarios are same as the realized day. Test apis with testclient and pytest.
