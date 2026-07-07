@@ -273,7 +273,7 @@ def apply_theme_and_header() -> None:
     st.set_page_config(page_title="Household Battery Scheduling", layout="wide")
     theme_css = """
         <style>
-            html, body, [class*="css"] { font-size: 1.30rem; }
+            html, body, [class*="css"] { font-size: 1.20rem; }
             .stApp {
                 background: linear-gradient(180deg, #1a103d 0%, #120a2c 100%);
                 color: #f8fafc;

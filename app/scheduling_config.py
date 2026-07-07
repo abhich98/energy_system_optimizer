@@ -17,6 +17,7 @@ AHEAD_REQUIRED_COLS = ["import_price"]
 SAMPLE_SINGLE_BATTERY_PATH = ROOT_DIR / "config" / "sonnenBatterie10.json"
 CHAMPION_POLICY_PATH = ROOT_DIR / "artifacts" / "champion.json"
 
+
 def load_json_file(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as file:
         return json.load(file)
@@ -28,6 +29,7 @@ DEFAULT_SOLVER_OPTS_DICT = {"timestep_hours": 1.0}
 OPEN_SOURCE_DATASET_PATH = (
     ROOT_DIR / "data" / "data_household_germany" / "Dataset_v1.2.0.xlsx"
 )
+OPEN_SOURCE_DATASET_INFO = 'This dataset comes from the paper "Dataset on electrical single-family house and heat pump load profiles in Germany" (https://doi.org/10.1038/s41597-022-01156-1)'
 
 OPEN_SOURCE_SHEET = 0
 OPEN_SOURCE_DATE_COL = "Date"
