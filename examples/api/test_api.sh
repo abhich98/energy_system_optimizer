@@ -16,16 +16,30 @@ curl -s ${API_URL}/health | python -m json.tool
 echo ""
 echo ""
 
-# Run optimization
-echo "2. Running optimization with sample files..."
-curl -X POST ${API_URL}/optimize \
-  -F "batteries_json=@batteries.json" \
-  -F "forecasts_csv=@forecasts.csv" \
-  -F "config_json=@config.json" \
-  -o schedule.csv
+# Test optimization endpoints with sample files 
+echo "2. Running optimization with dayahead/deterministic/upload..."
+curl -X POST ${API_URL}/dayahead/deterministic/upload \
+  -F "batteries_json=@sonnenBatterie10.json" \
+  -F "forecasts_csv=@20250424_german_household.csv" \
+  -F "timestep_hours=0.25" \
+  -o dayahead_deterministic_schedule.csv
 
 if [ $? -eq 0 ]; then
-  echo "Optimization complete! Results saved to schedule.csv"
+  echo "Optimization complete! Results saved to dayahead_deterministic_schedule.csv"
+else
+  echo "Optimization failed!"
+fi
+echo ""
+
+echo "3. Running optimization with dayahead/stochastic/upload..."
+curl -X POST ${API_URL}/dayahead/stochastic/upload \
+  -F "batteries_json=@sonnenBatterie10.json" \
+  -F "history_csv=@20250325_20250423_german_household.csv" \
+  -F "ahead_prices_csv=@20250424_german_household.csv" \
+  -o dayahead_stochastic_schedule.csv
+
+if [ $? -eq 0 ]; then
+  echo "Optimization complete! Results saved to dayahead_stochastic_schedule.csv"
 else
   echo "Optimization failed!"
 fi
