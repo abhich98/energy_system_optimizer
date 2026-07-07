@@ -241,10 +241,10 @@ def evaluate_expected_schedule(
     bess_discharge_values = np.zeros((len(batteries), time_points_per_day))
     for b_idx, battery in enumerate(batteries):
         bess_charge_values[b_idx, :] = battery_sched[
-            f"{battery.id}_charge_ahead"
+            f"{battery.id}_charge"
         ].to_numpy(dtype=float)
         bess_discharge_values[b_idx, :] = battery_sched[
-            f"{battery.id}_discharge_ahead"
+            f"{battery.id}_discharge"
         ].to_numpy(dtype=float)
 
     opt = EnergyOptimizer(

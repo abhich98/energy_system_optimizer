@@ -355,7 +355,7 @@ def apply_theme_and_header() -> None:
         """
         <div class="app-header">
             <h1>🔋 Household Battery Scheduling</h1>
-            <p>Obtain day-ahead (next day's) schedule for your household battery/BESS -- <i>when to charge and when not to.</i></p>
+            <p><i>When to charge and when not to</i> -- obtain day-ahead (next day's) schedule for your household battery/BESS.</p>
         </div>
         """,
         unsafe_allow_html=True,

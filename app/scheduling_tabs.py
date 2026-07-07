@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from typing import Optional, Tuple
 
 import pandas as pd
+import json
 import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
@@ -15,9 +17,11 @@ from scheduling_config import (
     AHEAD_REQUIRED_COLS,
     DETERM_REQUIRED_COLS,
     HIST_REQUIRED_COLS,
+
+    CHAMPION_POLICY_PATH,
+
     OPEN_SOURCE_DATASET_PATH,
     OPEN_SOURCE_DATE_COL,
-    OPEN_SOURCE_DEFAULT_HISTORY_DAYS,
     OPEN_SOURCE_END_MONTH,
     OPEN_SOURCE_LOAD_COL,
     OPEN_SOURCE_PRICE_COL,
@@ -112,9 +116,7 @@ def _load_open_source_dataset() -> pd.DataFrame:
     data_df = renamed_df[required_cols].copy()
     data_df["Date"] = pd.to_datetime(data_df["Date"], errors="coerce")
     data_df.dropna(subset=["Date", "pv", "load", "import_price"], inplace=True)
-    data_df = data_df[
-        data_df["Date"].dt.month.between(OPEN_SOURCE_START_MONTH, OPEN_SOURCE_END_MONTH)
-    ]
+
     data_df.sort_values("Date", inplace=True)
     data_df.reset_index(drop=True, inplace=True)
     return data_df
@@ -140,7 +142,7 @@ def _stochastic_controls(
             override["history_days"] = st.number_input(
                 "history_days",
                 min_value=1,
-                value=OPEN_SOURCE_DEFAULT_HISTORY_DAYS,
+                value=3,
                 key=f"{key_prefix}_history_days",
             )
             override["num_scenarios"] = st.number_input(
@@ -339,9 +341,12 @@ def render_scheduling_tabs() -> None:
             st.warning("No data available for the configured April–December window.")
             return
 
-        _render_open_source_overview(data_df)
+        display_df = data_df[
+        data_df["Date"].dt.month.between(OPEN_SOURCE_START_MONTH, OPEN_SOURCE_END_MONTH)
+        ]
+        _render_open_source_overview(display_df)
 
-        available_days = sorted(data_df["Date"].dt.date.unique())
+        available_days = sorted(display_df["Date"].dt.date.unique())
         selected_day = st.date_input(
             "Select day for day-ahead scheduling",
             value=available_days[0],
@@ -374,17 +379,21 @@ def render_scheduling_tabs() -> None:
             return
         batteries, opts, override = controls
 
-        # TODO: This causes a bug, implement a route to fetch the champion policy and use it to determine history_days 
-        history_days = OPEN_SOURCE_DEFAULT_HISTORY_DAYS
+        # Determine history_days from champion policy or override
+        if os.path.exists(CHAMPION_POLICY_PATH):
+            champion_spec = json.load(open(CHAMPION_POLICY_PATH, "r", encoding="utf-8"))
+            history_days = champion_spec["history_days"]
+        else:
+            history_days = 3
         if override and "history_days" in override:
             history_days = int(override["history_days"])
 
         history_start = day_start - pd.Timedelta(days=history_days)
         history_df = data_df[(data_df["Date"] >= history_start) & (data_df["Date"] < day_start)][
-            ["Date", "pv", "load"]
+            ["Date"] + HIST_REQUIRED_COLS
         ].copy()
         ahead_df = data_df[(data_df["Date"] >= day_start) & (data_df["Date"] < day_end)][
-            ["Date", "import_price"]
+            ["Date"] + AHEAD_REQUIRED_COLS
         ].copy()
 
         if ahead_df.empty:
