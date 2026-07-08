@@ -65,6 +65,10 @@ def battery_editor(key_prefix: str) -> Optional[list[dict[str, Any]]]:
         _seed_battery_widget_state(key_prefix, st.session_state[state_key])
 
     edited_batteries: list[dict[str, Any]] = []
+
+    def _clamp(value: float, low: float, high: float) -> float:
+        return max(low, min(high, float(value)))
+
     tabs = st.tabs(
         [f"Battery {i + 1}" for i in range(len(st.session_state[state_key]))]
     )
@@ -78,56 +82,112 @@ def battery_editor(key_prefix: str) -> Optional[list[dict[str, Any]]]:
                 st.rerun()
 
             st.text_input("id", key=f"{key_prefix}_id_{idx}")
-            col1, col2, col3 = st.columns(3)
-            col1.number_input(
+            st.slider(
                 f"capacity [{BATTERY_UNITS['capacity']}]",
-                min_value=0.001,
+                min_value=0.1,
+                max_value=200.0,
+                step=0.1,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_capacity_{idx}"],
+                    0.1,
+                    200.0,
+                ),
                 key=f"{key_prefix}_capacity_{idx}",
             )
-            col2.number_input(
+            st.slider(
                 f"max_charge [{BATTERY_UNITS['max_charge']}]",
-                min_value=0.001,
+                min_value=0.1,
+                max_value=100.0,
+                step=0.1,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_max_charge_{idx}"],
+                    0.1,
+                    100.0,
+                ),
                 key=f"{key_prefix}_max_charge_{idx}",
             )
-            col3.number_input(
+            st.slider(
                 f"max_discharge [{BATTERY_UNITS['max_discharge']}]",
-                min_value=0.001,
+                min_value=0.1,
+                max_value=100.0,
+                step=0.1,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_max_discharge_{idx}"],
+                    0.1,
+                    100.0,
+                ),
                 key=f"{key_prefix}_max_discharge_{idx}",
             )
-
-            col4, col5, col6 = st.columns(3)
-            col4.number_input(
+            st.slider(
                 "charge_efficiency",
                 min_value=0.0001,
                 max_value=1.0,
+                step=0.0001,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_charge_efficiency_{idx}"],
+                    0.0001,
+                    1.0,
+                ),
                 key=f"{key_prefix}_charge_efficiency_{idx}",
             )
-            col5.number_input(
+            st.slider(
                 "discharge_efficiency",
                 min_value=0.0001,
                 max_value=1.0,
+                step=0.0001,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_discharge_efficiency_{idx}"],
+                    0.0001,
+                    1.0,
+                ),
                 key=f"{key_prefix}_discharge_efficiency_{idx}",
             )
-            col6.number_input(
+            st.slider(
                 f"initial_soc [{BATTERY_UNITS['initial_soc']}]",
                 min_value=0.0,
+                max_value=200.0,
+                step=0.01,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_initial_soc_{idx}"],
+                    0.0,
+                    200.0,
+                ),
                 key=f"{key_prefix}_initial_soc_{idx}",
             )
-
-            col7, col8, col9 = st.columns(3)
-            col7.number_input(
+            st.slider(
                 f"min_soc [{BATTERY_UNITS['min_soc']}]",
                 min_value=0.0,
+                max_value=200.0,
+                step=0.01,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_min_soc_{idx}"],
+                    0.0,
+                    200.0,
+                ),
                 key=f"{key_prefix}_min_soc_{idx}",
             )
-            col8.number_input(
+            st.slider(
                 f"max_soc [{BATTERY_UNITS['max_soc']}]",
                 min_value=0.0,
+                max_value=200.0,
+                step=0.01,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_max_soc_{idx}"],
+                    0.0,
+                    200.0,
+                ),
                 key=f"{key_prefix}_max_soc_{idx}",
             )
-            col9.number_input(
+            st.slider(
                 f"degradation_cost [{BATTERY_UNITS['degradation_cost']}]",
                 min_value=0.0,
+                max_value=1.0,
+                step=0.001,
+                value=_clamp(
+                    st.session_state[f"{key_prefix}_degradation_cost_{idx}"],
+                    0.0,
+                    1.0,
+                ),
                 key=f"{key_prefix}_degradation_cost_{idx}",
             )
 
@@ -275,7 +335,9 @@ def apply_theme_and_header() -> None:
         <style>
             html, body, [class*="css"] { font-size: 1.20rem; }
             .stApp {
-                background: linear-gradient(180deg, #1a103d 0%, #120a2c 100%);
+                background: radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.18), transparent 40%),
+                            radial-gradient(circle at 80% 0%, rgba(34, 197, 94, 0.14), transparent 45%),
+                            linear-gradient(180deg, #1a103d 0%, #120a2c 100%);
                 color: #f8fafc;
             }
             [data-testid="stAppViewContainer"],
@@ -284,6 +346,10 @@ def apply_theme_and_header() -> None:
             [data-testid="stSidebar"],
             [data-testid="stSidebarNav"] {
                 background: transparent;
+            }
+            [data-testid="stSidebar"] > div:first-child {
+                background: linear-gradient(180deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.75) 100%);
+                border-right: 1px solid rgba(56, 189, 248, 0.25);
             }
             [data-testid="stMainBlockContainer"],
             [data-testid="stAppViewContainer"] .main .block-container,
@@ -303,7 +369,7 @@ def apply_theme_and_header() -> None:
                 background-color: #0ea5e9;
                 color: #ffffff;
                 border: 0;
-                border-radius: 10px;
+                border-radius: 8px;
                 font-weight: 700;
             }
             .stButton>button:hover {
@@ -314,7 +380,8 @@ def apply_theme_and_header() -> None:
                 color: #f8fafc;
             }
             .stTabs [aria-selected="true"] {
-                background-color: rgba(14, 165, 233, 0.18);
+                background: linear-gradient(90deg, rgba(14, 165, 233, 0.28), rgba(168, 85, 247, 0.22));
+                border-color: rgba(168, 85, 247, 0.45);
             }
             .stNumberInput input,
             .stTextInput input,
@@ -333,21 +400,63 @@ def apply_theme_and_header() -> None:
             .stCheckbox label {
                 color: #f8fafc !important;
             }
+            .stSlider [role="slider"] {
+                background: #facc15 !important;
+                border: 2px solid #0f172a !important;
+            }
+            .stSlider [role="slider"]:focus,
+            .stSlider [role="slider"]:focus-visible {
+                box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35) !important;
+                outline: none !important;
+            }
+            .stSlider [data-testid="stTickBarMin"],
+            .stSlider [data-testid="stTickBarMax"],
+            .stSlider [data-testid="stSliderMin"],
+            .stSlider [data-testid="stSliderMax"] {
+                color: #ffffff !important;
+                background: transparent !important;
+                text-shadow: 0 1px 2px rgba(15, 23, 42, 0.75) !important;
+            }
+            .stSlider:focus-within [data-testid="stTickBarMin"],
+            .stSlider:focus-within [data-testid="stTickBarMax"],
+            .stSlider:focus-within [data-testid="stSliderMin"],
+            .stSlider:focus-within [data-testid="stSliderMax"] {
+                color: #ffffff !important;
+                background: transparent !important;
+            }
+            .stExpander {
+                border: 1px solid rgba(56, 189, 248, 0.24) !important;
+                border-radius: 12px !important;
+                background: rgba(15, 23, 42, 0.32) !important;
+            }
+            .stInfo {
+                border-left: 6px solid #22d3ee !important;
+            }
+            .stSuccess {
+                border-left: 6px solid #34d399 !important;
+            }
+            .stWarning {
+                border-left: 6px solid #f59e0b !important;
+            }
+            .stError {
+                border-left: 6px solid #ef4444 !important;
+            }
             [data-testid="stDataFrame"] {
                 background: rgba(15, 23, 42, 0.88);
+                border: 1px solid rgba(168, 85, 247, 0.3);
+                border-radius: 10px;
             }
             .app-header {
-                background: linear-gradient(90deg, #0ea5e9, #22c55e);
+                background: linear-gradient(90deg, #0ea5e9, #22c55e, #a855f7);
                 padding: 18px 22px;
                 border-radius: 12px;
                 color: #ffffff;
                 text-align: center;
-                box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+                box-shadow: 0 18px 44px rgba(14, 165, 233, 0.24);
                 margin-top: 0;
             }
             .app-header h1 { color: #ffffff !important; font-size: 2.0rem; margin: 0; }
             .app-header p { margin: 8px 0 0 0; color: #e2e8f0; font-weight: 600; }
-            .stButton>button { border-radius: 8px; border: 0; font-weight: 700; }
         </style>
     """
     st.markdown(theme_css, unsafe_allow_html=True)
@@ -355,7 +464,7 @@ def apply_theme_and_header() -> None:
         """
         <div class="app-header">
             <h1>🔋 Household Battery Scheduling</h1>
-            <p><i>When to charge and when not to</i> -- obtain day-ahead (next day's) schedule for your household battery/BESS.</p>
+            <p><i>When to charge and when not to</i> -- obtain day-ahead (tomorrow's) schedule for your household battery/BESS.</p>
         </div>
         """,
         unsafe_allow_html=True,
