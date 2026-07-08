@@ -72,6 +72,7 @@ def battery_editor(key_prefix: str) -> Optional[list[dict[str, Any]]]:
     tabs = st.tabs(
         [f"Battery {i + 1}" for i in range(len(st.session_state[state_key]))]
     )
+    dcharge = 0.2
     for idx, tab in enumerate(tabs):
         with tab:
             if st.button("Reset to defaults", key=f"{key_prefix}_reset_{idx}"):
@@ -79,114 +80,118 @@ def battery_editor(key_prefix: str) -> Optional[list[dict[str, Any]]]:
                 st.session_state[state_key][idx] = reset_template
                 for key in reset_template.keys():
                     st.session_state[f"{key_prefix}_{key}_{idx}"] = reset_template[key]
-                st.rerun()
 
             st.text_input("id", key=f"{key_prefix}_id_{idx}")
             st.slider(
                 f"capacity [{BATTERY_UNITS['capacity']}]",
-                min_value=0.1,
-                max_value=200.0,
-                step=0.1,
+                min_value=dcharge,
+                max_value=100.0,
+                step=dcharge,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_capacity_{idx}"],
-                    0.1,
-                    200.0,
+                    dcharge,
+                    100.0,
                 ),
                 key=f"{key_prefix}_capacity_{idx}",
             )
+
+            capacity_now = float(st.session_state[f"{key_prefix}_capacity_{idx}"])
             st.slider(
                 f"max_charge [{BATTERY_UNITS['max_charge']}]",
-                min_value=0.1,
-                max_value=100.0,
-                step=0.1,
+                min_value=dcharge,
+                max_value=capacity_now,  # assuming battery takes at least 1 hour to charge fully
+                step=dcharge,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_max_charge_{idx}"],
-                    0.1,
-                    100.0,
+                    dcharge,
+                    capacity_now,
                 ),
                 key=f"{key_prefix}_max_charge_{idx}",
             )
             st.slider(
                 f"max_discharge [{BATTERY_UNITS['max_discharge']}]",
-                min_value=0.1,
-                max_value=100.0,
-                step=0.1,
+                min_value=dcharge,
+                max_value=capacity_now, # assuming battery takes at least 1 hour to discharge fully
+                step=dcharge,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_max_discharge_{idx}"],
-                    0.1,
-                    100.0,
+                    dcharge,
+                    capacity_now,
                 ),
                 key=f"{key_prefix}_max_discharge_{idx}",
             )
+
             st.slider(
                 "charge_efficiency",
-                min_value=0.0001,
+                min_value=0.01,
                 max_value=1.0,
-                step=0.0001,
+                step=0.01,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_charge_efficiency_{idx}"],
-                    0.0001,
+                    0.01,
                     1.0,
                 ),
                 key=f"{key_prefix}_charge_efficiency_{idx}",
             )
             st.slider(
                 "discharge_efficiency",
-                min_value=0.0001,
+                min_value=0.01,
                 max_value=1.0,
-                step=0.0001,
+                step=0.01,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_discharge_efficiency_{idx}"],
-                    0.0001,
+                    0.01,
                     1.0,
                 ),
                 key=f"{key_prefix}_discharge_efficiency_{idx}",
             )
+
             st.slider(
                 f"initial_soc [{BATTERY_UNITS['initial_soc']}]",
                 min_value=0.0,
-                max_value=200.0,
-                step=0.01,
+                max_value=capacity_now,
+                step=dcharge,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_initial_soc_{idx}"],
                     0.0,
-                    200.0,
+                    capacity_now,
                 ),
                 key=f"{key_prefix}_initial_soc_{idx}",
             )
             st.slider(
                 f"min_soc [{BATTERY_UNITS['min_soc']}]",
                 min_value=0.0,
-                max_value=200.0,
-                step=0.01,
+                max_value=capacity_now,
+                step=dcharge,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_min_soc_{idx}"],
                     0.0,
-                    200.0,
+                    capacity_now,
                 ),
                 key=f"{key_prefix}_min_soc_{idx}",
             )
             st.slider(
                 f"max_soc [{BATTERY_UNITS['max_soc']}]",
                 min_value=0.0,
-                max_value=200.0,
-                step=0.01,
+                max_value=capacity_now,
+                step=dcharge,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_max_soc_{idx}"],
                     0.0,
-                    200.0,
+                    capacity_now,
                 ),
                 key=f"{key_prefix}_max_soc_{idx}",
             )
+
             st.slider(
                 f"degradation_cost [{BATTERY_UNITS['degradation_cost']}]",
                 min_value=0.0,
-                max_value=1.0,
-                step=0.001,
+                max_value=0.5,
+                step=0.005,
                 value=_clamp(
                     st.session_state[f"{key_prefix}_degradation_cost_{idx}"],
                     0.0,
-                    1.0,
+                    0.5,
                 ),
                 key=f"{key_prefix}_degradation_cost_{idx}",
             )
@@ -238,11 +243,8 @@ def solver_opts_editor(key_prefix: str) -> Optional[dict[str, Any]]:
         value=float(opts.get("timestep_hours", 1.0)),
         step=0.25,
         key=f"{key_prefix}_timestep_hours",
+        help="Time interval in of the input data in hours. Example: 1.0 = hourly steps, 0.25 = 15-minute steps. Only applicable if 'Date' column is not provided in the input CSVs.",
     )
-    if info_col.button("ℹ️", key=f"{key_prefix}_timestep_hours_info"):
-        st.info(
-            "Optimization interval in hours. Example: 1.0 = hourly steps, 0.25 = 15-minute steps. Only applicable if 'Date' column is not provided in the input CSVs."
-        )
 
     edited = {"timestep_hours": float(timestep_hours)}
     if float(timestep_hours) <= 0:
@@ -343,10 +345,10 @@ def apply_theme_and_header() -> None:
             [data-testid="stAppViewContainer"],
             [data-testid="stHeader"],
             [data-testid="stToolbar"],
-            [data-testid="stSidebar"],
-            [data-testid="stSidebarNav"] {
+            [data-testid="stToolbar"] {
                 background: transparent;
             }
+            [data-testid="stSidebar"],
             [data-testid="stSidebar"] > div:first-child {
                 background: linear-gradient(180deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.75) 100%);
                 border-right: 1px solid rgba(56, 189, 248, 0.25);

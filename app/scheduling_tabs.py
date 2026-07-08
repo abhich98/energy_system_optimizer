@@ -46,10 +46,11 @@ def import_forecasts_flow(
 ) -> Optional[Tuple[pd.DataFrame, list[dict], dict]]:
     st.subheader("Forecast-based (deterministic) approach")
     st.markdown(
-        "*Provide PV generation and load forecasts, and electricity prices, for the next day.*"
+        "Requires *PV generation* and *load* forecasts, and *electricity prices*, for the next day."
     )
     uploaded = st.file_uploader(
-        "Upload CSV file (columns: "
+        "Upload CSV file",
+        help="(Required columns: "
         + ", ".join(DETERM_REQUIRED_COLS)
         + ", Date (date-time, optional))",
         type=["csv"],
@@ -61,7 +62,7 @@ def import_forecasts_flow(
 
     forecasts_df = pd.read_csv(uploaded)
     st.caption(f"Loaded `{uploaded.name}` ({len(forecasts_df)} rows)")
-    with st.expander("Inputs and Options", expanded=False):
+    with st.expander("Options", expanded=False):
         opts = solver_opts_editor(key_prefix="det")
 
     if sidebar_batteries is None or opts is None:
@@ -77,23 +78,28 @@ def import_history_flow(
 ):
     st.subheader("History-based (stochastic) approach")
     st.markdown(
-        "*Provide PV generation and load data from immediate past. Provide electricity prices for the next day.*"
+        "Requires *PV generation* and *load* data from immediate past. Also requires *electricity prices* for the next day."
     )
 
-    hist_u = st.file_uploader(
-        "Upload history CSV (columns: "
-        + ", ".join(HIST_REQUIRED_COLS)
-        + ", Date (date-time, optional))",
-        type=["csv"],
-        key="hist_upl",
-    )
-    ahead_u = st.file_uploader(
-        "Upload ahead prices CSV (columns: "
-        + ", ".join(AHEAD_REQUIRED_COLS)
-        + ", Date (date-time, optional))",
-        type=["csv"],
-        key="ahead_upl",
-    )
+    hist_col, ahead_col = st.columns(2)
+    with hist_col:
+        hist_u = st.file_uploader(
+            "Upload history CSV",
+            help="(Required columns: "
+            + ", ".join(HIST_REQUIRED_COLS)
+            + ", Date (date-time, optional))",
+            type=["csv"],
+            key="hist_upl",
+        )
+    with ahead_col:
+        ahead_u = st.file_uploader(
+            "Upload tomorrow's electricity prices CSV",
+            help="(Required columns: "
+            + ", ".join(AHEAD_REQUIRED_COLS)
+            + ", Date (date-time, optional))",
+            type=["csv"],
+            key="ahead_upl",
+        )
     if hist_u is None or ahead_u is None:
         st.info("Upload both history and ahead files to continue.")
         return None
@@ -165,7 +171,7 @@ def _stochastic_controls(
     key_prefix: str,
     batteries: Optional[list[dict]],
 ) -> Optional[Tuple[list[dict], dict, Optional[dict]]]:
-    with st.expander("Inputs and Options", expanded=False):
+    with st.expander("Options", expanded=False):
         opts = solver_opts_editor(key_prefix=key_prefix)
 
         override: Optional[dict[str, float | int]] = {}
@@ -209,8 +215,8 @@ def _stochastic_controls(
 
 
 def _render_forecast_preview(forecasts_df: pd.DataFrame) -> None:
-    st.subheader("Input preview")
-    with st.expander("Preview", expanded=True):
+    # st.subheader("Input preview")
+    with st.expander("Inputs Preview", expanded=True):
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
             fig = make_subplots(
@@ -242,8 +248,8 @@ def _render_forecast_preview(forecasts_df: pd.DataFrame) -> None:
 
 
 def _render_history_preview(hist_df: pd.DataFrame, ahead_df: pd.DataFrame) -> None:
-    st.subheader("Inputs preview")
-    with st.expander("Preview", expanded=True):
+    # st.subheader("Inputs preview")
+    with st.expander("Inputs Preview", expanded=True):
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
             fig = make_subplots(
@@ -298,36 +304,31 @@ def _render_open_source_overview(data_df: pd.DataFrame) -> None:
 
 
 def _require_champion_health(key_prefix: str) -> bool:
-    checked_key = f"champion_health_checked"
     ready_key = f"champion_health_ready"
-
-    if checked_key not in st.session_state:
-        st.session_state[checked_key] = False
     if ready_key not in st.session_state:
         st.session_state[ready_key] = None
 
-    check_now = st.button("Check health", key=f"{key_prefix}_check_champion_health")
-    if check_now:
-        with st.spinner("Checking champion policy on server..."):
-            st.session_state[ready_key] = is_champion_healthy()
-            st.session_state[checked_key] = True
+    button_col, status_col = st.columns([1, 3], vertical_alignment="center")
+    with button_col:
+        check_now = st.button("Check health", key=f"{key_prefix}_check_champion_health")
+        if check_now:
+            with st.spinner("Checking champion policy on server..."):
+                st.session_state[ready_key] = is_champion_healthy()
 
     champion_ready = st.session_state[ready_key]
-
     if champion_ready is None:
-        st.info("Champion policy status: Not checked")
+        status_text = "ℹ️ Health check: Not checked."
     elif champion_ready:
-        st.success("Champion policy status: Ready")
+        status_text = "✅ Health check: Champion policy is available."
     else:
-        st.error("Champion policy status: Unavailable")
+        status_text = "⚠️ Health check: Champion policy is unavailable."
+
+    with status_col:
+        st.markdown(status_text)
 
     if champion_ready is None:
-        st.info("Click 'Check health' to verify server readiness.")
         return False
     if not champion_ready:
-        st.warning(
-            "Champion policy is not configured on the server. This service is unavailable."
-        )
         return False
     return True
 
@@ -342,19 +343,28 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
         if det_inputs is not None:
             forecasts_df, batteries, opts = det_inputs
             _render_forecast_preview(forecasts_df)
-            if st.button("Run scheduling", key="run_det"):
-                with st.status("Running schedule optimization...", expanded=True) as status:
-                    status.write("Sending request to API...")
+            run_col, status_col = st.columns([1, 3], vertical_alignment="center")
+            with run_col:
+                run_det = st.button("Run scheduling", key="run_det")
+            with status_col:
+                det_status_placeholder = st.empty()
+                det_status = st.session_state.get("det_run_status", "")
+                if det_status:
+                    det_status_placeholder.markdown(det_status)
+
+            if run_det:
+                det_status_placeholder.markdown("⏳ Running schedule...")
+                with st.spinner("Calling API... (up to 5 minutes)"):
                     try:
                         output_df = call_deterministic_api(
                             batteries, forecasts_df, opts.get("timestep_hours")
                         )
                     except Exception as exc:
+                        st.session_state["det_run_status"] = "❌ Failed"
                         _display_api_error(exc)
                         st.stop()
-                    status.write("Rendering outputs...")
-                    status.update(label="Completed", state="complete")
-                st.success("Completed.")
+                st.session_state["det_run_status"] = "✅ Completed"
+                det_status_placeholder.markdown(st.session_state["det_run_status"])
                 with st.expander("Schedule output", expanded=True):
                     out_plot, out_table = st.tabs(["Plot", "Table"])
                     with out_plot:
@@ -362,6 +372,8 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         st.plotly_chart(chart, width="stretch")
                     with out_table:
                         st.dataframe(output_df, width="stretch", height=320)
+            else:
+                det_status_placeholder.markdown("")
 
     with stoch_tab:
         if _require_champion_health(key_prefix="stoch"):
@@ -369,9 +381,18 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             if stoch_inputs is not None:
                 hist_df, ahead_df, batteries, opts, override = stoch_inputs
                 _render_history_preview(hist_df, ahead_df)
-                if st.button("Run scheduling", key="run_stoch"):
-                    with st.status("Running schedule optimization...", expanded=True) as status:
-                        status.write("Sending request to API...")
+                run_col, status_col = st.columns([1, 3], vertical_alignment="center")
+                with run_col:
+                    run_stoch = st.button("Run scheduling", key="run_stoch")
+                with status_col:
+                    stoch_status_placeholder = st.empty()
+                    stoch_status = st.session_state.get("stoch_run_status", "")
+                    if stoch_status:
+                        stoch_status_placeholder.markdown(stoch_status)
+
+                if run_stoch:
+                    stoch_status_placeholder.markdown("⏳ Running schedule...")
+                    with st.spinner("Calling API... (up to 5 minutes)"):
                         try:
                             output_df = call_stochastic_api(
                                 batteries,
@@ -381,11 +402,11 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                                 opts.get("timestep_hours"),
                             )
                         except Exception as exc:
+                            st.session_state["stoch_run_status"] = "❌ Failed"
                             _display_api_error(exc)
                             st.stop()
-                        status.write("Rendering outputs...")
-                        status.update(label="Completed", state="complete")
-                    st.success("Completed.")
+                    st.session_state["stoch_run_status"] = "✅ Completed"
+                    stoch_status_placeholder.markdown(st.session_state["stoch_run_status"])
                     with st.expander("Schedule output", expanded=True):
                         out_plot, out_table = st.tabs(["Plot", "Table"])
                         with out_plot:
@@ -393,6 +414,8 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                             st.plotly_chart(chart, width="stretch")
                         with out_table:
                             st.dataframe(output_df, width="stretch", height=320)
+                else:
+                    stoch_status_placeholder.markdown("")
 
     with explore_tab:
         if _require_champion_health(key_prefix="explore"):
@@ -401,7 +424,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 help=OPEN_SOURCE_DATASET_INFO,
             )
             st.markdown(
-                "*Select a day in the open-source dataset. Corresponding history and ahead inputs are automatically selected.*"
+                "And select a day in the open-source dataset. Corresponding history and ahead inputs are automatically selected."
             )
 
             try:
@@ -475,9 +498,18 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
 
             _render_history_preview(history_df, ahead_df)
 
-            if st.button("Run scheduling", key="run_open_source"):
-                with st.status("Running schedule optimization...", expanded=True) as status:
-                    status.write("Sending request to API...")
+            run_col, status_col = st.columns([1, 3], vertical_alignment="center")
+            with run_col:
+                run_open_source = st.button("Run scheduling", key="run_open_source")
+            with status_col:
+                open_status_placeholder = st.empty()
+                open_status = st.session_state.get("open_run_status", "")
+                if open_status:
+                    open_status_placeholder.markdown(open_status)
+
+            if run_open_source:
+                open_status_placeholder.markdown("⏳ Running schedule...")
+                with st.spinner("Calling API... (up to 5 minutes)"):
                     try:
                         output_df = call_stochastic_api(
                             batteries,
@@ -487,11 +519,11 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                             opts.get("timestep_hours"),
                         )
                     except Exception as exc:
+                        st.session_state["open_run_status"] = "❌ Failed"
                         _display_api_error(exc)
                         st.stop()
-                    status.write("Rendering outputs...")
-                    status.update(label="Completed", state="complete")
-                st.success("Completed.")
+                st.session_state["open_run_status"] = "✅ Completed"
+                open_status_placeholder.markdown(st.session_state["open_run_status"])
                 with st.expander("Schedule output", expanded=True):
                     out_plot, out_table = st.tabs(["Plot", "Table"])
                     with out_plot:
@@ -499,3 +531,5 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         st.plotly_chart(chart, width="stretch")
                     with out_table:
                         st.dataframe(output_df, width="stretch", height=320)
+            else:
+                open_status_placeholder.markdown("")
