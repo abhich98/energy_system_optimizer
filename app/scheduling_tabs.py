@@ -43,6 +43,7 @@ def _display_api_error(exc: Exception) -> None:
 
 def import_forecasts_flow(
     sidebar_batteries: Optional[list[dict]],
+    collapse_above: bool,
 ) -> Optional[Tuple[pd.DataFrame, list[dict], dict]]:
     st.subheader("Forecast-based (deterministic) approach")
     st.markdown(
@@ -62,8 +63,20 @@ def import_forecasts_flow(
 
     forecasts_df = pd.read_csv(uploaded)
     st.caption(f"Loaded `{uploaded.name}` ({len(forecasts_df)} rows)")
-    with st.expander("Options", expanded=False):
-        opts = solver_opts_editor(key_prefix="det")
+    has_date = "Date" in forecasts_df.columns
+    if has_date:
+        opts: Optional[dict] = {"timestep_hours": None}
+    else:
+        with st.expander("Options", expanded=not collapse_above):
+            st.info(
+                "Warning: `Date` column missing in one or both files, assuming data belongs to the next day. Set correct `timestep_hours` in the options."
+            )
+            opts = solver_opts_editor(key_prefix="det")
+
+        tomo = pd.Timestamp.now().normalize() + pd.Timedelta(days=1)
+        forecasts_df["Date"] = pd.date_range(
+            start=tomo, periods=len(forecasts_df), freq=f"{opts['timestep_hours']}h"
+        )
 
     if sidebar_batteries is None or opts is None:
         st.info("Fix validation errors above to continue.")
@@ -73,6 +86,7 @@ def import_forecasts_flow(
 
 def import_history_flow(
     sidebar_batteries: Optional[list[dict]],
+    collapse_above: bool,
 ) -> (
     Optional[Tuple[pd.DataFrame, pd.DataFrame, list[dict], dict, Optional[dict]]]
 ):
@@ -101,24 +115,30 @@ def import_history_flow(
             key="ahead_upl",
         )
     if hist_u is None or ahead_u is None:
-        st.info("Upload both history and ahead files to continue.")
+        st.info("Upload both history and tomorrow's prices files to continue.")
         return None
 
     hist_df = pd.read_csv(hist_u)
     ahead_df = pd.read_csv(ahead_u)
     st.caption(
-        f"Loaded history `{hist_u.name}` ({len(hist_df)} rows) and ahead `{ahead_u.name}` ({len(ahead_df)} rows)"
+        f"Loaded history `{hist_u.name}` ({len(hist_df)} rows) and tomorrow's prices `{ahead_u.name}` ({len(ahead_df)} rows)"
     )
 
-    controls = _stochastic_controls(key_prefix="stoch", batteries=sidebar_batteries)
+    has_hist_date = "Date" in hist_df.columns
+    has_ahead_date = "Date" in ahead_df.columns
+    needs_timestep = (not has_hist_date) or (not has_ahead_date)
+
+    controls = _stochastic_controls(
+        key_prefix="stoch",
+        batteries=sidebar_batteries,
+        show_timestep=needs_timestep,
+        collapse_above=collapse_above,
+    )
     if controls is None:
         return None
     batteries, opts, override = controls
 
-    if "Date" not in hist_df.columns or "Date" not in ahead_df.columns:
-        st.info(
-            "Warning: 'Date' column missing in one or both files, assuming data belongs to the next day. Set correct timestep in the options."
-        )
+    if needs_timestep:
         tomo = pd.Timestamp.now().normalize() + pd.Timedelta(days=1)
 
         hist_df["Date"] = pd.date_range(
@@ -170,9 +190,17 @@ def _load_open_source_dataset() -> pd.DataFrame:
 def _stochastic_controls(
     key_prefix: str,
     batteries: Optional[list[dict]],
+    show_timestep: bool,
+    collapse_above: bool,
 ) -> Optional[Tuple[list[dict], dict, Optional[dict]]]:
-    with st.expander("Options", expanded=False):
-        opts = solver_opts_editor(key_prefix=key_prefix)
+    with st.expander("Options", expanded=not collapse_above):
+        if show_timestep:
+            st.info(
+                "Warning: `Date` column missing in one or both files, assuming data belongs to the next day. Set correct `timestep_hours` in the options."
+            )
+            opts = solver_opts_editor(key_prefix=key_prefix)
+        else:
+            opts = {"timestep_hours": None}
 
         override: Optional[dict[str, float | int]] = {}
         if st.checkbox(
@@ -214,9 +242,9 @@ def _stochastic_controls(
     return batteries, opts, override
 
 
-def _render_forecast_preview(forecasts_df: pd.DataFrame) -> None:
+def _render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) -> None:
     # st.subheader("Input preview")
-    with st.expander("Inputs Preview", expanded=True):
+    with st.expander("Inputs Preview", expanded=not collapse_above):
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
             fig = make_subplots(
@@ -247,9 +275,11 @@ def _render_forecast_preview(forecasts_df: pd.DataFrame) -> None:
             st.dataframe(forecasts_df.head(300), width="stretch", height=260)
 
 
-def _render_history_preview(hist_df: pd.DataFrame, ahead_df: pd.DataFrame) -> None:
+def _render_history_preview(
+    hist_df: pd.DataFrame, ahead_df: pd.DataFrame, collapse_above: bool
+) -> None:
     # st.subheader("Inputs preview")
-    with st.expander("Inputs Preview", expanded=True):
+    with st.expander("Inputs Preview", expanded=not collapse_above):
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
             fig = make_subplots(
@@ -278,12 +308,14 @@ def _render_history_preview(hist_df: pd.DataFrame, ahead_df: pd.DataFrame) -> No
         with table_tab:
             st.write("History (first rows)")
             st.dataframe(hist_df.head(200), width="stretch", height=200)
-            st.write("Ahead prices (first rows)")
+            st.write("Ahead/tomorrow's prices (first rows)")
             st.dataframe(ahead_df.head(200), width="stretch", height=200)
 
 
-def _render_open_source_overview(data_df: pd.DataFrame) -> None:
-    with st.expander("Open-source dataset preview (April–December)", expanded=True):
+def _render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> None:
+    with st.expander(
+        "Open-source dataset preview (April–December)", expanded=not collapse_above
+    ):
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06)
         fig.add_trace(
             go.Scatter(x=data_df["Date"], y=data_df["pv"], name="PV"), row=1, col=1
@@ -339,10 +371,17 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
     )
 
     with det_tab:
-        det_inputs = import_forecasts_flow(sidebar_batteries=sidebar_batteries)
+        det_collapse_above = st.session_state.get("det_collapse_above", False)
+        det_inputs = import_forecasts_flow(
+            sidebar_batteries=sidebar_batteries,
+            collapse_above=det_collapse_above,
+        )
         if det_inputs is not None:
             forecasts_df, batteries, opts = det_inputs
-            _render_forecast_preview(forecasts_df)
+            _render_forecast_preview(
+                forecasts_df=forecasts_df,
+                collapse_above=det_collapse_above,
+            )
             run_col, status_col = st.columns([1, 3], vertical_alignment="center")
             with run_col:
                 run_det = st.button("Run scheduling", key="run_det")
@@ -353,6 +392,12 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     det_status_placeholder.markdown(det_status)
 
             if run_det:
+                st.session_state["det_collapse_above"] = True
+                st.session_state["det_run_pending"] = True
+                st.rerun()
+
+            if st.session_state.get("det_run_pending", False):
+                st.session_state["det_run_pending"] = False
                 det_status_placeholder.markdown("⏳ Running schedule...")
                 with st.spinner("Calling API... (up to 5 minutes)"):
                     try:
@@ -372,15 +417,24 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         st.plotly_chart(chart, width="stretch")
                     with out_table:
                         st.dataframe(output_df, width="stretch", height=320)
+                st.session_state["det_collapse_above"] = False
             else:
                 det_status_placeholder.markdown("")
 
     with stoch_tab:
+        stoch_collapse_above = st.session_state.get("stoch_collapse_above", False)
         if _require_champion_health(key_prefix="stoch"):
-            stoch_inputs = import_history_flow(sidebar_batteries=sidebar_batteries)
+            stoch_inputs = import_history_flow(
+                sidebar_batteries=sidebar_batteries,
+                collapse_above=stoch_collapse_above,
+            )
             if stoch_inputs is not None:
                 hist_df, ahead_df, batteries, opts, override = stoch_inputs
-                _render_history_preview(hist_df, ahead_df)
+                _render_history_preview(
+                    hist_df=hist_df,
+                    ahead_df=ahead_df,
+                    collapse_above=stoch_collapse_above,
+                )
                 run_col, status_col = st.columns([1, 3], vertical_alignment="center")
                 with run_col:
                     run_stoch = st.button("Run scheduling", key="run_stoch")
@@ -391,6 +445,12 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         stoch_status_placeholder.markdown(stoch_status)
 
                 if run_stoch:
+                    st.session_state["stoch_collapse_above"] = True
+                    st.session_state["stoch_run_pending"] = True
+                    st.rerun()
+
+                if st.session_state.get("stoch_run_pending", False):
+                    st.session_state["stoch_run_pending"] = False
                     stoch_status_placeholder.markdown("⏳ Running schedule...")
                     with st.spinner("Calling API... (up to 5 minutes)"):
                         try:
@@ -414,17 +474,19 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                             st.plotly_chart(chart, width="stretch")
                         with out_table:
                             st.dataframe(output_df, width="stretch", height=320)
+                    st.session_state["stoch_collapse_above"] = False
                 else:
                     stoch_status_placeholder.markdown("")
 
     with explore_tab:
+        open_collapse_above = st.session_state.get("open_collapse_above", False)
         if _require_champion_health(key_prefix="explore"):
             st.subheader(
                 "Explore open-source dataset (both approaches)",
                 help=OPEN_SOURCE_DATASET_INFO,
             )
             st.markdown(
-                "And select a day in the open-source dataset. Corresponding history and ahead inputs are automatically selected."
+                "And select a date in the open-source dataset. Corresponding history and tomorrow's inputs are automatically selected."
             )
 
             try:
@@ -444,11 +506,14 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     OPEN_SOURCE_START_MONTH, OPEN_SOURCE_END_MONTH
                 )
             ]
-            _render_open_source_overview(display_df)
+            _render_open_source_overview(
+                data_df=display_df,
+                collapse_above=open_collapse_above,
+            )
 
             available_days = sorted(display_df["Date"].dt.date.unique())
             selected_day = st.date_input(
-                "Select day for which to generate schedule",
+                "Select date for which to generate schedule",
                 value=available_days[0],
                 min_value=available_days[0],
                 max_value=available_days[-1],
@@ -459,7 +524,10 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             day_end = day_start + pd.Timedelta(days=1)
 
             controls = _stochastic_controls(
-                key_prefix="open", batteries=sidebar_batteries
+                key_prefix="open",
+                batteries=sidebar_batteries,
+                show_timestep=False,
+                collapse_above=open_collapse_above,
             )
             if controls is None:
                 return
@@ -496,7 +564,11 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 )
                 return
 
-            _render_history_preview(history_df, ahead_df)
+            _render_history_preview(
+                hist_df=history_df,
+                ahead_df=ahead_df,
+                collapse_above=open_collapse_above,
+            )
 
             run_col, status_col = st.columns([1, 3], vertical_alignment="center")
             with run_col:
@@ -508,6 +580,12 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     open_status_placeholder.markdown(open_status)
 
             if run_open_source:
+                st.session_state["open_collapse_above"] = True
+                st.session_state["open_run_pending"] = True
+                st.rerun()
+
+            if st.session_state.get("open_run_pending", False):
+                st.session_state["open_run_pending"] = False
                 open_status_placeholder.markdown("⏳ Running schedule...")
                 with st.spinner("Calling API... (up to 5 minutes)"):
                     try:
@@ -523,6 +601,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         _display_api_error(exc)
                         st.stop()
                 st.session_state["open_run_status"] = "✅ Completed"
+                
                 open_status_placeholder.markdown(st.session_state["open_run_status"])
                 with st.expander("Schedule output", expanded=True):
                     out_plot, out_table = st.tabs(["Plot", "Table"])
@@ -531,5 +610,6 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         st.plotly_chart(chart, width="stretch")
                     with out_table:
                         st.dataframe(output_df, width="stretch", height=320)
+                st.session_state["open_collapse_above"] = False
             else:
                 open_status_placeholder.markdown("")

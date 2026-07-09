@@ -69,6 +69,9 @@ def battery_editor(key_prefix: str) -> Optional[list[dict[str, Any]]]:
     def _clamp(value: float, low: float, high: float) -> float:
         return max(low, min(high, float(value)))
 
+    def _clamp_state(key: str, low: float, high: float) -> None:
+        st.session_state[key] = _clamp(st.session_state[key], low, high)
+
     tabs = st.tabs(
         [f"Battery {i + 1}" for i in range(len(st.session_state[state_key]))]
     )
@@ -82,117 +85,81 @@ def battery_editor(key_prefix: str) -> Optional[list[dict[str, Any]]]:
                     st.session_state[f"{key_prefix}_{key}_{idx}"] = reset_template[key]
 
             st.text_input("id", key=f"{key_prefix}_id_{idx}")
+            _clamp_state(f"{key_prefix}_capacity_{idx}", dcharge, 100.0)
             st.slider(
                 f"capacity [{BATTERY_UNITS['capacity']}]",
                 min_value=dcharge,
                 max_value=100.0,
                 step=dcharge,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_capacity_{idx}"],
-                    dcharge,
-                    100.0,
-                ),
                 key=f"{key_prefix}_capacity_{idx}",
             )
 
             capacity_now = float(st.session_state[f"{key_prefix}_capacity_{idx}"])
+            _clamp_state(f"{key_prefix}_max_charge_{idx}", dcharge, capacity_now)
             st.slider(
                 f"max_charge [{BATTERY_UNITS['max_charge']}]",
                 min_value=dcharge,
                 max_value=capacity_now,  # assuming battery takes at least 1 hour to charge fully
                 step=dcharge,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_max_charge_{idx}"],
-                    dcharge,
-                    capacity_now,
-                ),
                 key=f"{key_prefix}_max_charge_{idx}",
             )
+            _clamp_state(f"{key_prefix}_max_discharge_{idx}", dcharge, capacity_now)
             st.slider(
                 f"max_discharge [{BATTERY_UNITS['max_discharge']}]",
                 min_value=dcharge,
                 max_value=capacity_now, # assuming battery takes at least 1 hour to discharge fully
                 step=dcharge,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_max_discharge_{idx}"],
-                    dcharge,
-                    capacity_now,
-                ),
                 key=f"{key_prefix}_max_discharge_{idx}",
             )
 
+            _clamp_state(f"{key_prefix}_charge_efficiency_{idx}", 0.01, 1.0)
             st.slider(
                 "charge_efficiency",
                 min_value=0.01,
                 max_value=1.0,
                 step=0.01,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_charge_efficiency_{idx}"],
-                    0.01,
-                    1.0,
-                ),
                 key=f"{key_prefix}_charge_efficiency_{idx}",
             )
+            _clamp_state(f"{key_prefix}_discharge_efficiency_{idx}", 0.01, 1.0)
             st.slider(
                 "discharge_efficiency",
                 min_value=0.01,
                 max_value=1.0,
                 step=0.01,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_discharge_efficiency_{idx}"],
-                    0.01,
-                    1.0,
-                ),
                 key=f"{key_prefix}_discharge_efficiency_{idx}",
             )
 
+            _clamp_state(f"{key_prefix}_initial_soc_{idx}", 0.0, capacity_now)
             st.slider(
                 f"initial_soc [{BATTERY_UNITS['initial_soc']}]",
                 min_value=0.0,
                 max_value=capacity_now,
                 step=dcharge,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_initial_soc_{idx}"],
-                    0.0,
-                    capacity_now,
-                ),
                 key=f"{key_prefix}_initial_soc_{idx}",
             )
+            _clamp_state(f"{key_prefix}_min_soc_{idx}", 0.0, capacity_now)
             st.slider(
                 f"min_soc [{BATTERY_UNITS['min_soc']}]",
                 min_value=0.0,
                 max_value=capacity_now,
                 step=dcharge,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_min_soc_{idx}"],
-                    0.0,
-                    capacity_now,
-                ),
                 key=f"{key_prefix}_min_soc_{idx}",
             )
+            _clamp_state(f"{key_prefix}_max_soc_{idx}", 0.0, capacity_now)
             st.slider(
                 f"max_soc [{BATTERY_UNITS['max_soc']}]",
                 min_value=0.0,
                 max_value=capacity_now,
                 step=dcharge,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_max_soc_{idx}"],
-                    0.0,
-                    capacity_now,
-                ),
                 key=f"{key_prefix}_max_soc_{idx}",
             )
 
+            _clamp_state(f"{key_prefix}_degradation_cost_{idx}", 0.0, 0.5)
             st.slider(
                 f"degradation_cost [{BATTERY_UNITS['degradation_cost']}]",
                 min_value=0.0,
                 max_value=0.5,
                 step=0.005,
-                value=_clamp(
-                    st.session_state[f"{key_prefix}_degradation_cost_{idx}"],
-                    0.0,
-                    0.5,
-                ),
                 key=f"{key_prefix}_degradation_cost_{idx}",
             )
 
