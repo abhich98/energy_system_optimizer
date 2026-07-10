@@ -94,8 +94,8 @@ Example:
 
 ```bash
 curl -X POST https://esms-chft.onrender.com/dayahead/deterministic/upload \
-  -F "batteries_json=@examples/api/batteries.json" \
-  -F "forecasts_csv=@examples/api/forecasts.csv" \
+  -F "batteries_json=@resources/api/batteries.json" \
+  -F "forecasts_csv=@resources/api/forecasts.csv" \
   -F "timestep_hours=0.25" \
   -o dayahead_deterministic_schedule.csv
 ```
@@ -168,10 +168,10 @@ Example:
 
 ```bash
 curl -X POST https://esms-chft.onrender.com/dayahead/stochastic/upload \
-  -F "batteries_json=@examples/api/batteries.json" \
-  -F "history_csv=@examples/api/history.csv" \
-  -F "ahead_prices_csv=@examples/api/ahead_prices.csv" \
-  -F "policy_override_json=@examples/api/policy_override.json" \
+  -F "batteries_json=@resources/api/batteries.json" \
+  -F "history_csv=@resources/api/history.csv" \
+  -F "ahead_prices_csv=@resources/api/ahead_prices.csv" \
+  -F "policy_override_json=@resources/api/policy_override.json" \
   -F "timestep_hours=0.25" \
   -o dayahead_stochastic_schedule.csv
 ```

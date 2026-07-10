@@ -54,6 +54,35 @@ def _verify_solver_availability(solver_name: str) -> str:
         return "glpk"
 
 
+def _build_schedule_dataframe_stochastic(output_df: pd.DataFrame, 
+                                         batteries: list[Battery],
+                                         expected_load: np.ndarray,
+                                         expected_pv: np.ndarray) -> pd.DataFrame:
+    """Build a schedule DataFrame from the output of the stochastic optimizer."""
+    schedule_dict = {
+        "Date": output_df["Date"],
+        "expected_load": expected_load,
+        "expected_pv": expected_pv,
+
+        # Since grid import/export prices are considered recourse/real-time variables
+        "import_price": output_df["expected_import_price_rt"],
+        "export_price": output_df["expected_export_price_rt"],
+        "expected_grid_import": output_df["expected_grid_import_rt"],
+        "expected_grid_export": output_df["expected_grid_export_rt"],
+    }
+
+    for battery in batteries:
+        # Since battery charge/discharge and SOC are considered ahead variables
+        schedule_dict[f"{battery.id}_charge"] = output_df[f"{battery.id}_charge_ahead"]
+        schedule_dict[f"{battery.id}_discharge"] = output_df[f"{battery.id}_discharge_ahead"]
+        schedule_dict[f"{battery.id}_soc"] = output_df[f"expected_{battery.id}_soc"]
+
+    schedule_df = pd.DataFrame(schedule_dict)
+    schedule_df.set_index("Date", inplace=True)
+
+    return schedule_df
+
+
 def generate_daily_scenarios(
     policy: PolicySpec,
     history_df: pd.DataFrame,
@@ -151,9 +180,16 @@ def run_expected_schedule(
     )
     runtime = time.time() - t0
 
-    expected_df = opt.results_to_dataframe(res)
-    expected_df.index = pd.to_datetime(day_df["Date"].to_numpy())
-    expected_df.index.name = "Date"
+    output_df = opt.results_to_dataframe(res)
+
+    output_df["Date"] = pd.to_datetime(day_df["Date"].to_numpy())
+    expected_df = _build_schedule_dataframe_stochastic(
+        output_df,
+        batteries,
+        expected_load=np.average(load_scen, axis=0, weights=probs),
+        expected_pv=np.average(pv_scen, axis=0, weights=probs) 
+    )
+
     return expected_df, runtime
 
 
@@ -205,10 +241,10 @@ def evaluate_expected_schedule(
     bess_discharge_values = np.zeros((len(batteries), time_points_per_day))
     for b_idx, battery in enumerate(batteries):
         bess_charge_values[b_idx, :] = battery_sched[
-            f"{battery.id}_charge_ahead"
+            f"{battery.id}_charge"
         ].to_numpy(dtype=float)
         bess_discharge_values[b_idx, :] = battery_sched[
-            f"{battery.id}_discharge_ahead"
+            f"{battery.id}_discharge"
         ].to_numpy(dtype=float)
 
     opt = EnergyOptimizer(

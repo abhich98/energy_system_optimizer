@@ -12,7 +12,6 @@ from household_battery.api.models import (
     StochasticRequest,
 )
 
-
 LOCAL_TESTING = False  # Set to True for local testing without API calls
 if LOCAL_TESTING:
     from fastapi.testclient import TestClient

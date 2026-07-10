@@ -12,10 +12,10 @@ from household_battery.api.main import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLES_API_DIR = ROOT / "examples" / "api"
+RESOURCES_API_DIR = ROOT / "resources" / "api"
 BATTERIES_PATH = ROOT / "config" / "sonnenBatterie10.json"
-HISTORY_PATH = EXAMPLES_API_DIR / "20250325_20250423_german_household.csv"
-AHEAD_DAY_PATH = EXAMPLES_API_DIR / "20250424_german_household.csv"
+HISTORY_PATH = RESOURCES_API_DIR / "20250325_20250423_german_household.csv"
+AHEAD_DAY_PATH = RESOURCES_API_DIR / "20250424_german_household.csv"
 
 client = TestClient(app)
 

@@ -14,7 +14,7 @@ from esms.utils import build_batteries
 from household_battery.policies import PolicySpec, save_champion_local
 from household_battery.metrics import DailyMetrics, aggregate_metrics
 from household_battery.selection import should_promote, load_rules
-from household_battery.backtest import run_expected_schedule, evaluate_expected_schedule
+from household_battery.schedule import run_expected_schedule, evaluate_expected_schedule
 
 
 logging.basicConfig(
