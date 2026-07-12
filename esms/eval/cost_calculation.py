@@ -238,13 +238,21 @@ class OptimizationCostCalculator:
     def calculate_from_dataframe(
         self,
         results_df: pd.DataFrame,
-        battery_file: str | Path,
+        battery_file: str | Path | None = None,
+        degradation_costs: dict[str, float] | None = None,
         mode: str = "deterministic",
     ) -> CostBreakdown:
         if results_df.empty:
             raise ValueError("results_df is empty")
 
-        degradation_map = self._load_battery_degradation_map(battery_file)
+        if battery_file is not None:
+            degradation_map = self._load_battery_degradation_map(battery_file)
+        elif degradation_costs is not None:
+            degradation_map = degradation_costs
+        else:
+            raise ValueError(
+                "Either battery_file or degradation_costs must be provided for cost calculation"
+            )
 
         match mode:
             case "deterministic":
