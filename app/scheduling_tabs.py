@@ -99,8 +99,8 @@ def _execute_pending_run(
     status_key: str,
     status_placeholder: Any,
     output_key: str,
-    run_call: Callable[[], pd.DataFrame],
-) -> Optional[pd.DataFrame]:
+    run_call: Callable[[], Any],
+) -> Any:
     """Execute pending run or return stored output.
 
     On pending: runs the API call, stores result in session_state.
@@ -302,7 +302,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 with st.expander("Schedule output", expanded=True):
                     _render_battery_download(output_df, batteries, key_suffix="det")
                     out_plot, out_analytics, out_table = st.tabs(
-                        ["Plot", "Analytics", "Table"]
+                        ["Plots", "Analytics", "Table"]
                     )
                     with out_plot:
                         chart = build_output_panel_chart(
@@ -376,15 +376,15 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                             output_df, batteries, key_suffix="stoch"
                         )
                         out_plot, out_analytics, out_table = st.tabs(
-                            ["Plot", "Analytics", "Table"]
+                            ["Plots", "Analytics", "Table"]
                         )
                         with out_plot:
                             chart = build_output_panel_chart(
                                 ahead_df.copy(),
                                 output_df,
                                 batteries=batteries,
-                                pv_label="Expected PV",
-                                load_label="Expected Load",
+                                pv_label="Expected PV (from history)",
+                                load_label="Expected Load (from history)",
                             )
                             st.plotly_chart(chart, width="stretch")
                         with out_analytics:
@@ -515,42 +515,69 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             _clear_if_inputs_changed(
                 "open", history_df, ahead_df, batteries, opts, override
             )
-            output_df = _execute_pending_run(
+
+            def _run_both_optimizations() -> tuple[pd.DataFrame, pd.DataFrame]:
+                """Run both perfect foresight (deterministic) and stochastic optimizations."""
+                ts = opts.get("timestep_hours")
+                det_output = call_deterministic_api(batteries, ahead_df, ts)
+                stoch_output = call_stochastic_api(
+                    batteries, history_df, ahead_df, override, ts
+                )
+                return det_output, stoch_output
+
+            output_dfs = _execute_pending_run(
                 pending_key=open_pending_key,
                 status_key=open_status_key,
                 status_placeholder=open_status_placeholder,
                 output_key=_tab_state_key("open", "output_df"),
-                run_call=lambda: call_stochastic_api(
-                    batteries,
-                    history_df,
-                    ahead_df,
-                    override,
-                    opts.get("timestep_hours"),
-                ),
+                run_call=_run_both_optimizations,
             )
-            if output_df is not None:
+            if output_dfs is not None:
+                det_output, stoch_output = output_dfs
                 with st.expander("Schedule output", expanded=True):
-                    _render_battery_download(output_df, batteries, key_suffix="open")
-                    out_plot, out_analytics, out_table = st.tabs(
-                        ["Plot", "Analytics", "Table"]
+                    # _render_battery_download(
+                    #     stoch_output, batteries, key_suffix="open_stoch"
+                    # )
+                    out_pf_plot, out_stoch_plot, out_analytics, out_table = st.tabs(
+                        ["Perfect Foresight Plots", "Stochastic Plots (based on history)", "Analytics", "Table"]
                     )
-                    with out_plot:
-                        chart = build_output_panel_chart(
+                    with out_pf_plot:
+                        chart_pf = build_output_panel_chart(
                             ahead_df.copy(),
-                            output_df,
+                            det_output,
                             batteries=batteries,
-                            pv_label="Expected PV",
-                            load_label="Expected Load",
-                            show_actual=True,
+                            pv_label="PV (perfect foresight)",
+                            load_label="Load (perfect foresight)",
                         )
-                        st.plotly_chart(chart, width="stretch")
+                        st.plotly_chart(chart_pf, width="stretch")
+                    with out_stoch_plot:
+                        chart_stoch = build_output_panel_chart(
+                                ahead_df.copy(),
+                                stoch_output,
+                                batteries=batteries,
+                                pv_label="Expected PV (from history)",
+                                load_label="Expected Load (from history)",
+                            )
+                        st.plotly_chart(chart_stoch, width="stretch")
+
                     with out_analytics:
+                        st.markdown("**Perfect Foresight**")
                         render_schedule_analytics(
                             input_df=ahead_df,
-                            output_df=output_df,
+                            output_df=det_output,
+                            batteries=batteries,
+                            timestep_hours_hint=opts.get("timestep_hours"),
+                        )
+                        st.markdown("**Stochastic (from history)**")
+                        render_schedule_analytics(
+                            input_df=ahead_df,
+                            output_df=stoch_output,
                             batteries=batteries,
                             timestep_hours_hint=opts.get("timestep_hours"),
                         )
                     with out_table:
-                        st.dataframe(output_df, width="stretch", height=320)
+                        st.write("Perfect Foresight schedule")
+                        st.dataframe(det_output, width="stretch", height=320)
+                        st.write("Stochastic (from history) schedule")
+                        st.dataframe(stoch_output, width="stretch", height=320)
                 st.session_state[open_collapse_key] = False
