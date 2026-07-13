@@ -255,6 +255,8 @@ def build_output_panel_chart(
         pv_label: Label for PV trace (e.g., "Forecasted PV", "Expected PV").
         load_label: Label for Load trace (e.g., "Forecasted Load", "Expected Load").
         show_actual: If True, also show actual pv/load from input_df as separate traces.
+
+    # TODO: show_actual and input_df are turning out to be redundant, but keeping them for now in case we want to show actual vs expected in the future.
     """
     # Detect battery IDs from output columns
     battery_ids: list[str] = []
@@ -282,13 +284,7 @@ def build_output_panel_chart(
         specs=specs,
     )
 
-    input_x = (
-        input_df["Date"]
-        if "Date" in input_df.columns
-        else (
-            input_df["timestep"] if "timestep" in input_df.columns else input_df.index
-        )
-    )
+    input_x = input_df["Date"] if "Date" in input_df.columns else input_df.index
     output_x = output_df["Date"] if "Date" in output_df.columns else output_df.index
 
     # Row 1: PV and Load

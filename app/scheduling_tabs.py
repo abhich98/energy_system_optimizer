@@ -8,7 +8,7 @@ from typing import Any, Callable, Optional, Tuple
 
 import pandas as pd
 import streamlit as st
-from scheduling_analytics import render_schedule_analytics
+from scheduling_analytics import render_schedule_analytics, render_comparative_analytics
 from scheduling_api import (
     call_deterministic_api,
     call_stochastic_api,
@@ -234,7 +234,7 @@ def _require_champion_health(key_prefix: str) -> bool:
     with button_col:
         check_now = st.button("Check health", key=f"{key_prefix}_check_champion_health")
         if check_now:
-            with st.spinner("Checking champion policy on server..."):
+            with st.spinner("Checking champion policy on server, could take a few minutes..."):
                 st.session_state[ready_key] = is_champion_healthy()
 
     champion_ready = st.session_state[ready_key]
@@ -561,17 +561,10 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         st.plotly_chart(chart_stoch, width="stretch")
 
                     with out_analytics:
-                        st.markdown("**Perfect Foresight**")
-                        render_schedule_analytics(
-                            input_df=ahead_df,
-                            output_df=det_output,
-                            batteries=batteries,
-                            timestep_hours_hint=opts.get("timestep_hours"),
-                        )
-                        st.markdown("**Stochastic (from history)**")
-                        render_schedule_analytics(
-                            input_df=ahead_df,
-                            output_df=stoch_output,
+                        render_comparative_analytics(
+                            actual_df=ahead_df,
+                            det_output=det_output,
+                            stoch_output=stoch_output,
                             batteries=batteries,
                             timestep_hours_hint=opts.get("timestep_hours"),
                         )
