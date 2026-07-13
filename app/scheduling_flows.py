@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional, Tuple
 
+from matplotlib.pyplot import plot
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -47,9 +48,11 @@ def import_forecasts_flow(
     collapse_above: bool,
 ) -> Optional[Tuple[pd.DataFrame, list[dict], dict]]:
     """Import and validate deterministic forecasts (PV, load, prices)."""
-    st.subheader("Forecast-based (deterministic) approach")
+    st.subheader(
+        "Forecast-based (deterministic) approach",
+        help="If good forecasts of PV generation and load (consumption) are available.",
+    )
     st.markdown(
-        "If good forecasts of PV generation and load (consumption) are available.  \n"
         "Requires `pv` generation and `load` forecasts, and `import_price` (electricity prices), for the next day."
     )
 
@@ -111,9 +114,11 @@ def import_history_flow(
     ],
 ) -> Optional[Tuple[pd.DataFrame, pd.DataFrame, list[dict], dict, Optional[dict]]]:
     """Import and validate history and ahead prices for stochastic approach."""
-    st.subheader("History-based (stochastic) approach")
+    st.subheader(
+        "History-based (stochastic) approach",
+        help="If history of PV generation and load (consumption) is available.",
+    )
     st.markdown(
-        "If history of PV generation and load (consumption) is available.  \n"
         "Requires `pv` generation and `load` data from immediate past (5-10 days recommended). Also requires `import_price` (electricity prices) for the next day."
     )
 
@@ -271,7 +276,7 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
                     row=2,
                     col=1,
                 )
-            fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1)
+            fig.update_yaxes(title_text="Electricity Price (EUR/kWh)", row=2, col=1)
             fig.update_layout(height=600, margin=dict(t=40, b=20))
             st.plotly_chart(fig, width="stretch")
         with table_tab:
@@ -279,9 +284,16 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
 
 
 def render_history_preview(
-    hist_df: pd.DataFrame, ahead_df: pd.DataFrame, collapse_above: bool
+    hist_df: pd.DataFrame,
+    ahead_df: pd.DataFrame,
+    plot_all: bool = False,
+    collapse_above: bool = False,
 ) -> None:
-    """Render stochastic history and ahead price inputs."""
+    """Render stochastic history and ahead price inputs.
+
+    History traces are shown with dotted lines; ahead day traces with solid lines.
+    A vertical line with annotations marks the boundary between history and selected day.
+    """
     with st.expander("Inputs Preview", expanded=not collapse_above):
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
@@ -290,13 +302,16 @@ def render_history_preview(
             )
             xh = hist_df["Date"] if "Date" in hist_df.columns else hist_df.index
             xa = ahead_df["Date"] if "Date" in ahead_df.columns else ahead_df.index
+
+            # History traces: dotted lines
             if all(c in hist_df.columns for c in ["pv", "load"]):
                 fig.add_trace(
                     go.Scatter(
                         x=xh,
                         y=hist_df["pv"],
-                        name="PV (history)",
-                        line=dict(color=COLOR_PV),
+                        name="PV",
+                        showlegend=False,
+                        line=dict(color=COLOR_PV, dash="dot"),
                     ),
                     row=1,
                     col=1,
@@ -305,27 +320,102 @@ def render_history_preview(
                     go.Scatter(
                         x=xh,
                         y=hist_df["load"],
-                        name="Load (history)",
+                        name="Load",
+                        showlegend=False,
+                        line=dict(color=COLOR_LOAD, dash="dot"),
+                    ),
+                    row=1,
+                    col=1,
+                )
+
+            # Ahead day traces: solid lines
+            if plot_all and all(c in ahead_df.columns for c in ["pv", "load"]):
+                fig.add_trace(
+                    go.Scatter(
+                        x=xa,
+                        y=ahead_df["pv"],
+                        name="PV",
+                        line=dict(color=COLOR_PV),
+                    ),
+                    row=1,
+                    col=1,
+                )
+                fig.add_trace(
+                    go.Scatter(
+                        x=xa,
+                        y=ahead_df["load"],
+                        name="Load",
                         line=dict(color=COLOR_LOAD),
                     ),
                     row=1,
                     col=1,
                 )
             fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
+
+            # Plot electricity prices in the second subplot
+            # History prices: dotted (only if plot_all)
+            if plot_all and "import_price" in hist_df.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=xh,
+                        y=hist_df["import_price"],
+                        name="Import Price",
+                        showlegend=False,
+                        line=dict(color=COLOR_PRICE, dash="dot"),
+                    ),
+                    row=2,
+                    col=1,
+                )
+            # Ahead prices: solid
             if "import_price" in ahead_df.columns:
                 fig.add_trace(
                     go.Scatter(
                         x=xa,
                         y=ahead_df["import_price"],
-                        name="Import Price (ahead)",
+                        name="Import Price",
                         line=dict(color=COLOR_PRICE),
                     ),
                     row=2,
                     col=1,
                 )
-            fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1)
+            fig.update_yaxes(title_text="Electricity Price (EUR/kWh)", row=2, col=1)
+
+            # Add boundary line + annotations if both have Date columns
+            if "Date" in hist_df.columns and "Date" in ahead_df.columns:
+                boundary = ahead_df["Date"].min()
+                for row in [1, 2]:
+                    fig.add_vline(
+                        x=boundary,
+                        line_dash="dash",
+                        line_color="rgba(255,255,255,0.5)",
+                        line_width=1.5,
+                        row=row,
+                        col=1,
+                    )
+                fig.add_annotation(
+                    x=boundary,
+                    yref="paper",
+                    y=1.0,
+                    text="History ←",
+                    showarrow=False,
+                    xanchor="right",
+                    yanchor="top",
+                    font=dict(color="rgba(255,255,255,0.85)", size=21),
+                )
+                fig.add_annotation(
+                    x=boundary,
+                    yref="paper",
+                    y=1.0,
+                    text="→ Selected Day",
+                    showarrow=False,
+                    xanchor="left",
+                    yanchor="top",
+                    font=dict(color="rgba(255,255,255,0.85)", size=21),
+                )
+
             fig.update_layout(height=600, margin=dict(t=40, b=20))
             st.plotly_chart(fig, width="stretch")
+
         with table_tab:
             st.write("History (first rows)")
             st.dataframe(hist_df.head(200), width="stretch", height=200)
@@ -353,7 +443,7 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
             go.Scatter(
                 x=data_df["Date"],
                 y=data_df["load"],
-                name="Consumption",
+                name="Load/Consumption",
                 line=dict(color=COLOR_LOAD),
             ),
             row=1,
@@ -370,6 +460,6 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
             row=2,
             col=1,
         )
-        fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1)
+        fig.update_yaxes(title_text="Electricity Price (EUR/kWh)", row=2, col=1)
         fig.update_layout(height=600, margin=dict(t=40, b=20))
         st.plotly_chart(fig, width="stretch")

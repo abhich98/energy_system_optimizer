@@ -1,8 +1,21 @@
 from __future__ import annotations
 
+import threading
+
+import requests
+from scheduling_api import is_champion_healthy
 import streamlit as st
+from scheduling_config import API_BASE
 from scheduling_tabs import render_scheduling_tabs
 from scheduling_ui import apply_theme_and_header, battery_editor
+
+
+def _wake_up_backend() -> None:
+    """Ping the backend once per session (not per rerun). Wake up the backend and check champion health status."""
+    ready_key = "champion_health_ready"
+    if ready_key not in st.session_state:
+        st.session_state[ready_key] = None
+        threading.Thread(target=is_champion_healthy, daemon=True).start()
 
 
 def _render_instructions() -> None:
@@ -25,6 +38,7 @@ def _render_sidebar_batteries() -> list[dict] | None:
 
 
 def main() -> None:
+    _wake_up_backend()
     apply_theme_and_header()
     sidebar_batteries = _render_sidebar_batteries()
     _render_instructions()

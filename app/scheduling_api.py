@@ -7,7 +7,6 @@ import requests
 from scheduling_config import API_BASE, DETERM_ENDPOINT, STOCH_ENDPOINT
 
 from household_battery.api.models import (
-    ChampionPolicy,
     DeterministicRequest,
     StochasticRequest,
 )
@@ -39,7 +38,7 @@ def get_available_solvers() -> list[str]:
 
 def is_champion_healthy() -> bool:
     try:
-        response = requests.get(f"{API_BASE}/health", timeout=15)
+        response = requests.get(f"{API_BASE}/health", timeout=120)
         return response.json().get("champion_policy", {}).get("exists", False)
     except Exception:
         return False

@@ -66,6 +66,34 @@ def _display_api_error(exc: Exception) -> None:
         st.error(f"Scheduling failed: {exc}")
 
 
+def _inputs_signature(*args: Any) -> str:
+    """Create a lightweight signature from input arguments to detect changes.
+
+    DataFrames are hashed by shape + columns (fast, catches file swaps).
+    Everything else is stringified.
+    """
+    parts: list[str] = []
+    for arg in args:
+        if isinstance(arg, pd.DataFrame):
+            parts.append(f"df:{arg.shape}:{list(arg.columns)}")
+        else:
+            parts.append(str(arg))
+    return "|".join(parts)
+
+
+def _clear_if_inputs_changed(tab_prefix: str, *args: Any) -> None:
+    """Clear stored output + status if any input changed since last run."""
+    sig_key = _tab_state_key(tab_prefix, "input_sig")
+    output_key = _tab_state_key(tab_prefix, "output_df")
+    status_key = _tab_state_key(tab_prefix, "run_status")
+
+    current_sig = _inputs_signature(*args)
+    if st.session_state.get(sig_key) != current_sig:
+        st.session_state[output_key] = None
+        st.session_state[status_key] = ""
+    st.session_state[sig_key] = current_sig
+
+
 def _execute_pending_run(
     pending_key: str,
     status_key: str,
@@ -73,35 +101,32 @@ def _execute_pending_run(
     output_key: str,
     run_call: Callable[[], pd.DataFrame],
 ) -> Optional[pd.DataFrame]:
-    """Execute pending run request with consistent spinner/status/error behavior.
+    """Execute pending run or return stored output.
 
-    The output DataFrame is persisted in session_state under output_key so that
-    it survives reruns triggered by button clicks (e.g. download button).
+    On pending: runs the API call, stores result in session_state.
+    Otherwise: returns stored output if it exists (survives non-run reruns).
     """
-    if not st.session_state.get(pending_key, False):
-        stored = st.session_state.get(output_key)
-        if stored is not None:
-            status_text = st.session_state.get(status_key, "")
-            if status_text:
-                status_placeholder.markdown(status_text)
-            return stored
+    if st.session_state.get(pending_key, False):
+        st.session_state[pending_key] = False
+        status_placeholder.markdown("⏳ Running schedule...")
+        with st.spinner("Calling API... (up to 5 minutes)"):
+            try:
+                output_df = run_call()
+            except Exception as exc:
+                st.session_state[status_key] = "❌ Failed"
+                st.session_state[output_key] = None
+                _display_api_error(exc)
+                st.stop()
+        st.session_state[status_key] = "✅ Completed"
+        st.session_state[output_key] = output_df
+
+    output_df = st.session_state.get(output_key)
+    if output_df is not None:
+        status_text = st.session_state.get(status_key, "")
+        if status_text:
+            status_placeholder.markdown(status_text)
+    else:
         status_placeholder.markdown("")
-        return None
-
-    st.session_state[pending_key] = False
-    status_placeholder.markdown("⏳ Running schedule...")
-    with st.spinner("Calling API... (up to 5 minutes)"):
-        try:
-            output_df = run_call()
-        except Exception as exc:
-            st.session_state[status_key] = "❌ Failed"
-            st.session_state[output_key] = None
-            _display_api_error(exc)
-            st.stop()
-
-    st.session_state[status_key] = "✅ Completed"
-    st.session_state[output_key] = output_df
-    status_placeholder.markdown(st.session_state[status_key])
     return output_df
 
 
@@ -218,7 +243,7 @@ def _require_champion_health(key_prefix: str) -> bool:
     elif champion_ready:
         status_text = "✅ Health check: Champion policy is available."
     else:
-        status_text = "⚠️ Health check: Backend is taking longer than expected, please try again in 2 mins."
+        status_text = "⚠️ Health check: Backend is taking longer than expected to wake up, please try again in 2 mins."
 
     with status_col:
         st.markdown(status_text)
@@ -263,6 +288,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 st.session_state[det_pending_key] = True
                 st.rerun()
 
+            _clear_if_inputs_changed("det", forecasts_df, batteries, opts)
             output_df = _execute_pending_run(
                 pending_key=det_pending_key,
                 status_key=det_status_key,
@@ -328,6 +354,9 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     st.session_state[stoch_pending_key] = True
                     st.rerun()
 
+                _clear_if_inputs_changed(
+                    "stoch", hist_df, ahead_df, batteries, opts, override
+                )
                 output_df = _execute_pending_run(
                     pending_key=stoch_pending_key,
                     status_key=stoch_status_key,
@@ -382,7 +411,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 help=OPEN_SOURCE_DATASET_INFO,
             )
             st.markdown(
-                "And select a date, corresponding history and ahead inputs are automatically selected."
+                "And select a date, corresponding history and prices are automatically selected."
             )
 
             try:
@@ -402,19 +431,26 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     OPEN_SOURCE_START_MONTH, OPEN_SOURCE_END_MONTH
                 )
             ]
-            render_open_source_overview(
-                data_df=display_df,
-                collapse_above=open_collapse_above,
-            )
 
             available_days = sorted(display_df["Date"].dt.date.unique())
+            render_open_source_overview(
+                data_df=display_df,
+                collapse_above=st.session_state.get("open_source_selected_day")
+                is not None,
+            )
+
             selected_day = st.date_input(
-                "Select date for which to generate schedule",
-                value=available_days[0],
+                "Select date for which to generate/optimize schedule",
+                value=None,
                 min_value=available_days[0],
                 max_value=available_days[-1],
                 key="open_source_selected_day",
             )
+            if selected_day is None:
+                st.info(
+                    "Pick a date above to load the corresponding inputs and options."
+                )
+                return
 
             day_start = pd.Timestamp(selected_day)
             day_end = day_start + pd.Timedelta(days=1)
@@ -443,10 +479,10 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             history_start = day_start - pd.Timedelta(days=history_days)
             history_df = data_df[
                 (data_df["Date"] >= history_start) & (data_df["Date"] < day_start)
-            ][["Date"] + HIST_REQUIRED_COLS].copy()
+            ][["Date"] + HIST_REQUIRED_COLS + AHEAD_REQUIRED_COLS].copy()
             ahead_df = data_df[
                 (data_df["Date"] >= day_start) & (data_df["Date"] < day_end)
-            ][["Date"] + AHEAD_REQUIRED_COLS].copy()
+            ][["Date"] + HIST_REQUIRED_COLS + AHEAD_REQUIRED_COLS].copy()
 
             if ahead_df.empty:
                 st.error(
@@ -462,6 +498,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             render_history_preview(
                 hist_df=history_df,
                 ahead_df=ahead_df,
+                plot_all=True,
                 collapse_above=open_collapse_above,
             )
 
@@ -475,6 +512,9 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 st.session_state[open_pending_key] = True
                 st.rerun()
 
+            _clear_if_inputs_changed(
+                "open", history_df, ahead_df, batteries, opts, override
+            )
             output_df = _execute_pending_run(
                 pending_key=open_pending_key,
                 status_key=open_status_key,

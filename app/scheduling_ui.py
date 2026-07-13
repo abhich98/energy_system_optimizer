@@ -371,7 +371,9 @@ def build_output_panel_chart(
                 row=2,
                 col=1,
             )
-    fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1, autorange=True)
+    fig.update_yaxes(
+        title_text="Electricity Price (EUR/kWh)", row=2, col=1, autorange=True
+    )
 
     # Rows 3+: Per-battery charge/discharge + SOC
     battery_capacities: dict[str, float] = {}
@@ -390,7 +392,7 @@ def build_output_panel_chart(
             fig.add_trace(
                 go.Scatter(
                     x=output_x,
-                    y=output_df[charge_col],
+                    y=output_df[charge_col].round(4),
                     mode="lines",
                     name=f"{bid} Charge",
                     line=dict(color=COLOR_CHARGE),
@@ -403,7 +405,7 @@ def build_output_panel_chart(
             fig.add_trace(
                 go.Scatter(
                     x=output_x,
-                    y=output_df[discharge_col],
+                    y=output_df[discharge_col].round(4),
                     mode="lines",
                     name=f"{bid} Discharge",
                     line=dict(color=COLOR_DISCHARGE),
