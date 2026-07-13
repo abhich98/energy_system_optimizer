@@ -32,6 +32,8 @@ from scheduling_flows import (
 )
 from scheduling_ui import build_output_panel_chart, solver_opts_editor
 
+from esms.models.battery import BATTERY_UNITS
+
 
 def _tab_state_key(tab_prefix: str, suffix: str) -> str:
     """Build consistent session-state keys for a tab."""
@@ -68,10 +70,21 @@ def _execute_pending_run(
     pending_key: str,
     status_key: str,
     status_placeholder: Any,
+    output_key: str,
     run_call: Callable[[], pd.DataFrame],
 ) -> Optional[pd.DataFrame]:
-    """Execute pending run request with consistent spinner/status/error behavior."""
+    """Execute pending run request with consistent spinner/status/error behavior.
+
+    The output DataFrame is persisted in session_state under output_key so that
+    it survives reruns triggered by button clicks (e.g. download button).
+    """
     if not st.session_state.get(pending_key, False):
+        stored = st.session_state.get(output_key)
+        if stored is not None:
+            status_text = st.session_state.get(status_key, "")
+            if status_text:
+                status_placeholder.markdown(status_text)
+            return stored
         status_placeholder.markdown("")
         return None
 
@@ -82,12 +95,55 @@ def _execute_pending_run(
             output_df = run_call()
         except Exception as exc:
             st.session_state[status_key] = "❌ Failed"
+            st.session_state[output_key] = None
             _display_api_error(exc)
             st.stop()
 
     st.session_state[status_key] = "✅ Completed"
+    st.session_state[output_key] = output_df
     status_placeholder.markdown(st.session_state[status_key])
     return output_df
+
+
+def _render_battery_download(
+    output_df: pd.DataFrame, batteries: list[dict], key_suffix: str
+) -> None:
+    """Render a download button for a CSV containing only battery columns."""
+    battery_colname_suffixes = ("charge", "discharge", "soc")
+
+    battery_cols: list[str] = []
+    for bat in batteries:
+        bid = str(bat["id"])
+        for suffix in battery_colname_suffixes:
+            col = f"{bid}_{suffix}"
+            if col in output_df.columns:
+                battery_cols.append(col)
+
+    if not battery_cols:
+        return
+
+    download_df = output_df[battery_cols].copy()
+
+    column_units = {
+        "charge": f"{BATTERY_UNITS['max_charge']}",
+        "discharge": f"{BATTERY_UNITS['max_discharge']}",
+        "soc": f"{BATTERY_UNITS['capacity']}",
+    }
+    download_df.rename(
+        columns={
+            col: f"{col}_{column_units[col.split('_')[-1]]}" for col in battery_cols
+        },
+        inplace=True,
+    )
+
+    date = output_df.index[0].strftime("%Y%m%d")
+    st.download_button(
+        label="Download battery schedule (CSV)",
+        data=download_df.to_csv(index=True),
+        file_name=f"battery_schedule_{date}.csv",
+        mime="text/csv",
+        key=f"download_battery_{key_suffix}",
+    )
 
 
 def _stochastic_controls(
@@ -108,7 +164,7 @@ def _stochastic_controls(
 
         override: Optional[dict[str, float | int]] = {}
         if st.checkbox(
-            "Override champion policy (optional) for this run.",
+            "Override champion policy for this run (optional).",
             key=f"{key_prefix}_enable_override",
         ):
             override["history_days"] = st.number_input(
@@ -162,7 +218,7 @@ def _require_champion_health(key_prefix: str) -> bool:
     elif champion_ready:
         status_text = "✅ Health check: Champion policy is available."
     else:
-        status_text = "⚠️ Health check: Champion policy is unavailable."
+        status_text = "⚠️ Health check: Backend is taking longer than expected, please try again in 2 mins."
 
     with status_col:
         st.markdown(status_text)
@@ -211,12 +267,14 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 pending_key=det_pending_key,
                 status_key=det_status_key,
                 status_placeholder=det_status_placeholder,
+                output_key=_tab_state_key("det", "output_df"),
                 run_call=lambda: call_deterministic_api(
                     batteries, forecasts_df, opts.get("timestep_hours")
                 ),
             )
             if output_df is not None:
                 with st.expander("Schedule output", expanded=True):
+                    _render_battery_download(output_df, batteries, key_suffix="det")
                     out_plot, out_analytics, out_table = st.tabs(
                         ["Plot", "Analytics", "Table"]
                     )
@@ -225,8 +283,8 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                             forecasts_df,
                             output_df,
                             batteries=batteries,
-                            pv_label="Forecasted PV",
-                            load_label="Forecasted Load",
+                            pv_label="Provided PV forecast",
+                            load_label="Provided Load forecast",
                         )
                         st.plotly_chart(chart, width="stretch")
                     with out_analytics:
@@ -274,6 +332,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     pending_key=stoch_pending_key,
                     status_key=stoch_status_key,
                     status_placeholder=stoch_status_placeholder,
+                    output_key=_tab_state_key("stoch", "output_df"),
                     run_call=lambda: call_stochastic_api(
                         batteries,
                         hist_df,
@@ -284,6 +343,9 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 )
                 if output_df is not None:
                     with st.expander("Schedule output", expanded=True):
+                        _render_battery_download(
+                            output_df, batteries, key_suffix="stoch"
+                        )
                         out_plot, out_analytics, out_table = st.tabs(
                             ["Plot", "Analytics", "Table"]
                         )
@@ -417,6 +479,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 pending_key=open_pending_key,
                 status_key=open_status_key,
                 status_placeholder=open_status_placeholder,
+                output_key=_tab_state_key("open", "output_df"),
                 run_call=lambda: call_stochastic_api(
                     batteries,
                     history_df,
@@ -427,6 +490,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             )
             if output_df is not None:
                 with st.expander("Schedule output", expanded=True):
+                    _render_battery_download(output_df, batteries, key_suffix="open")
                     out_plot, out_analytics, out_table = st.tabs(
                         ["Plot", "Analytics", "Table"]
                     )
