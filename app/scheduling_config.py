@@ -39,3 +39,16 @@ OPEN_SOURCE_PRICE_COL = "Energy price (EUR/kWh)"
 
 OPEN_SOURCE_START_MONTH = 4
 OPEN_SOURCE_END_MONTH = 12
+
+# Color palette for dark blue background
+CHART_COLORS = {
+    "pv": "#f59e0b",  # amber
+    "load": "#22d3ee",  # cyan
+    "price": "#a855f7",  # purple
+    "export_price": "#94a3b8",  # slate
+    "charge": "#34d399",  # emerald
+    "discharge": "#fb7185",  # rose
+    "soc": "#facc15",  # yellow
+    "actual": "#60a5fa",  # blue
+    "expected": "#f472b6",  # pink
+}
