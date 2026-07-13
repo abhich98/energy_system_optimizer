@@ -12,7 +12,6 @@ import streamlit as st
 from esms.eval import OptimizationCostCalculator
 from esms.eval import DeterministicPerformanceCalculator
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -38,23 +37,29 @@ def resolve_timestep_hours(df: pd.DataFrame, fallback: Optional[float]) -> float
     return 1.0
 
 
-def total_battery_flows(output_df: pd.DataFrame, batteries: list[dict]) -> tuple[pd.Series, pd.Series]:
+def total_battery_flows(
+    output_df: pd.DataFrame, batteries: list[dict]
+) -> tuple[pd.Series, pd.Series]:
     """Sum all battery charge and discharge columns across all batteries."""
-    charge_cols = [
-        f"{b['id']}_charge" for b in batteries
-    ]
-    assert all(c in output_df.columns for c in charge_cols), "Missing charge columns in output"
-    discharge_cols = [
-        f"{b['id']}_discharge" for b in batteries
-    ]
-    assert all(c in output_df.columns for c in discharge_cols), "Missing discharge columns in output"
+    charge_cols = [f"{b['id']}_charge" for b in batteries]
+    discharge_cols = [f"{b['id']}_discharge" for b in batteries]
 
-    if charge_cols:
-        charge_series = output_df[charge_cols].sum(axis=1)
+    missing_charge = [col for col in charge_cols if col not in output_df.columns]
+    missing_discharge = [col for col in discharge_cols if col not in output_df.columns]
+    if missing_charge:
+        logger.warning("Missing charge columns in output: %s", missing_charge)
+    if missing_discharge:
+        logger.warning("Missing discharge columns in output: %s", missing_discharge)
+
+    present_charge_cols = [col for col in charge_cols if col in output_df.columns]
+    present_discharge_cols = [col for col in discharge_cols if col in output_df.columns]
+
+    if present_charge_cols:
+        charge_series = output_df[present_charge_cols].sum(axis=1)
     else:
         charge_series = pd.Series(0.0, index=output_df.index)
-    if discharge_cols:
-        discharge_series = output_df[discharge_cols].sum(axis=1)
+    if present_discharge_cols:
+        discharge_series = output_df[present_discharge_cols].sum(axis=1)
     else:
         discharge_series = pd.Series(0.0, index=output_df.index)
 
@@ -85,42 +90,31 @@ def render_schedule_analytics(
         return
 
     # Extract and coerce numeric series
-    load_series = (
-        pd.to_numeric(output_df[load_col], errors="coerce").fillna(0.0)
-    )
-    pv_series = (
-        pd.to_numeric(
-            output_df[pv_col],
-            errors="coerce",
-        )
-        .fillna(0.0)
-    )
-    import_price_series = (
-        pd.to_numeric(
-            output_df[import_price_col],
-            errors="coerce",
-        )
-        .fillna(0.0)
-    )
-    scheduled_import = (
-        pd.to_numeric(output_df[grid_import_col], errors="coerce").fillna(0.0)
-    )
+    load_series = pd.to_numeric(output_df[load_col], errors="coerce").fillna(0.0)
+    pv_series = pd.to_numeric(
+        output_df[pv_col],
+        errors="coerce",
+    ).fillna(0.0)
+    import_price_series = pd.to_numeric(
+        output_df[import_price_col],
+        errors="coerce",
+    ).fillna(0.0)
+    scheduled_import = pd.to_numeric(
+        output_df[grid_import_col], errors="coerce"
+    ).fillna(0.0)
 
     if grid_export_col and grid_export_col in output_df.columns:
-        scheduled_export = (
-            pd.to_numeric(output_df[grid_export_col], errors="coerce").fillna(0.0)
-        )
+        scheduled_export = pd.to_numeric(
+            output_df[grid_export_col], errors="coerce"
+        ).fillna(0.0)
     else:
         scheduled_export = pd.Series(0.0, index=output_df.index)
 
     if export_price_col:
-        export_price_series = (
-            pd.to_numeric(
-                output_df[export_price_col],
-                errors="coerce",
-            )
-            .fillna(0.0)
-        )
+        export_price_series = pd.to_numeric(
+            output_df[export_price_col],
+            errors="coerce",
+        ).fillna(0.0)
     else:
         export_price_series = pd.Series(0.0, index=output_df.index)
 
@@ -128,8 +122,11 @@ def render_schedule_analytics(
 
     # USING EXISTING CALCULATORS TO COMPUTE COSTS AND KPIS
     data_df = output_df.copy()
-    data_df.rename(columns={col: col.replace("expected_", "") for col in data_df.columns}, inplace=True)
-    
+    data_df.rename(
+        columns={col: col.replace("expected_", "") for col in data_df.columns},
+        inplace=True,
+    )
+
     cost_calc = OptimizationCostCalculator(dt_hours=timestep_hours)
     logger.info("Calculating cost breakdown using OptimizationCostCalculator...")
     costs = cost_calc.calculate_from_dataframe(
@@ -138,7 +135,9 @@ def render_schedule_analytics(
     )
 
     perf_calc = DeterministicPerformanceCalculator(dt_hours=timestep_hours)
-    logger.info("Calculating performance breakdown using DeterministicPerformanceCalculator...")
+    logger.info(
+        "Calculating performance breakdown using DeterministicPerformanceCalculator..."
+    )
     performance = perf_calc.calculate_from_dataframe(data_df)
 
     # Compute baseline (no-battery) series — not available from calculators
@@ -154,8 +153,12 @@ def render_schedule_analytics(
     for bat in batteries:
         charge_series = output_df[f"{bat['id']}_charge"]
         discharge_series = output_df[f"{bat['id']}_discharge"]
-        scheduled_cost_series += (charge_series * bat["degradation_cost"] * timestep_hours)
-        scheduled_cost_series += (discharge_series * bat["degradation_cost"] * timestep_hours)
+        scheduled_cost_series += (
+            charge_series * bat["degradation_cost"] * timestep_hours
+        )
+        scheduled_cost_series += (
+            discharge_series * bat["degradation_cost"] * timestep_hours
+        )
 
     # Baseline KPIs (explicit)
     baseline_cost = float(baseline_cost_series.sum())
@@ -179,7 +182,11 @@ def render_schedule_analytics(
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Scheduled Cost", f"€{scheduled_cost:.2f}")
     k2.metric("Savings vs Baseline", f"€{savings:.2f}", f"{savings_pct:.1f}%")
-    k3.metric("Peak Import Reduction", f"{peak_reduction:.2f} kW", f"{peak_reduction_pct:.1f}%")
+    k3.metric(
+        "Peak Import Reduction",
+        f"{peak_reduction:.2f} kW",
+        f"{peak_reduction_pct:.1f}%",
+    )
     k4.metric("Self-Consumption", f"{self_consumption_pct:.1f}%")
 
     k5, k6 = st.columns(2)
@@ -212,16 +219,20 @@ def render_schedule_analytics(
         fig_grid.update_layout(
             title="Grid Import: Baseline vs Scheduled", margin=dict(t=40, b=20)
         )
-        st.plotly_chart(fig_grid, width='stretch')
+        st.plotly_chart(fig_grid, width="stretch")
 
     with c2:
-        duration_df = pd.DataFrame(
-            {
-                "price": import_price_series.values,
-                "charge": charge_series.values,
-                "discharge": discharge_series.values,
-            }
-        ).sort_values("price").reset_index(drop=True)
+        duration_df = (
+            pd.DataFrame(
+                {
+                    "price": import_price_series.values,
+                    "charge": charge_series.values,
+                    "discharge": discharge_series.values,
+                }
+            )
+            .sort_values("price")
+            .reset_index(drop=True)
+        )
         duration_df["rank"] = range(1, len(duration_df) + 1)
         fig_duration = go.Figure()
         fig_duration.add_trace(
@@ -258,7 +269,7 @@ def render_schedule_analytics(
             title="Price-Duration with Charge/Discharge Markers",
             margin=dict(t=40, b=20),
         )
-        st.plotly_chart(fig_duration, width='stretch')
+        st.plotly_chart(fig_duration, width="stretch")
 
     fig_cum = go.Figure()
     fig_cum.add_trace(
@@ -280,4 +291,4 @@ def render_schedule_analytics(
     fig_cum.update_layout(
         title="Cumulative Cost: Baseline vs Scheduled", margin=dict(t=40, b=20)
     )
-    st.plotly_chart(fig_cum, width='stretch')
+    st.plotly_chart(fig_cum, width="stretch")

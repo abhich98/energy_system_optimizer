@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -10,18 +10,36 @@ import streamlit as st
 from plotly.subplots import make_subplots
 from scheduling_config import (
     AHEAD_REQUIRED_COLS,
+    CHART_COLORS,
     DETERM_REQUIRED_COLS,
     HIST_REQUIRED_COLS,
     OPEN_SOURCE_DATASET_PATH,
     OPEN_SOURCE_DATE_COL,
-    OPEN_SOURCE_END_MONTH,
     OPEN_SOURCE_LOAD_COL,
     OPEN_SOURCE_PRICE_COL,
     OPEN_SOURCE_PV_COL,
     OPEN_SOURCE_SHEET,
-    OPEN_SOURCE_START_MONTH,
 )
 from scheduling_ui import solver_opts_editor
+
+# Color palette for dark blue background
+COLOR_PV = CHART_COLORS["pv"]
+COLOR_LOAD = CHART_COLORS["load"]
+COLOR_PRICE = CHART_COLORS["price"]
+
+
+def _validate_required_columns(
+    df: pd.DataFrame, required_cols: list[str], label: str
+) -> bool:
+    """Validate required columns and render a consistent error message if missing."""
+    missing = [col for col in required_cols if col not in df.columns]
+    if missing:
+        st.error(
+            f"{label} is missing required columns: {', '.join(missing)}. "
+            f"Expected: {', '.join(required_cols)}"
+        )
+        return False
+    return True
 
 
 def import_forecasts_flow(
@@ -51,6 +69,13 @@ def import_forecasts_flow(
         return None
 
     forecasts_df = pd.read_csv(uploaded)
+    if not _validate_required_columns(
+        forecasts_df,
+        DETERM_REQUIRED_COLS,
+        "Forecast CSV",
+    ):
+        return None
+
     st.caption(f"Loaded `{uploaded.name}` ({len(forecasts_df)} rows)")
     has_date = "Date" in forecasts_df.columns
     if has_date:
@@ -80,6 +105,10 @@ def import_forecasts_flow(
 def import_history_flow(
     sidebar_batteries: Optional[list[dict]],
     collapse_above: bool,
+    stochastic_controls_renderer: Callable[
+        [str, Optional[list[dict]], bool, bool],
+        Optional[Tuple[list[dict], dict, Optional[dict]]],
+    ],
 ) -> Optional[Tuple[pd.DataFrame, pd.DataFrame, list[dict], dict, Optional[dict]]]:
     """Import and validate history and ahead prices for stochastic approach."""
     st.subheader("History-based (stochastic) approach")
@@ -115,6 +144,19 @@ def import_history_flow(
 
     hist_df = pd.read_csv(hist_u)
     ahead_df = pd.read_csv(ahead_u)
+    if not _validate_required_columns(
+        hist_df,
+        HIST_REQUIRED_COLS,
+        "History CSV",
+    ):
+        return None
+    if not _validate_required_columns(
+        ahead_df,
+        AHEAD_REQUIRED_COLS,
+        "Tomorrow prices CSV",
+    ):
+        return None
+
     st.caption(
         f"Loaded history `{hist_u.name}` ({len(hist_df)} rows) and tomorrow's prices `{ahead_u.name}` ({len(ahead_df)} rows)"
     )
@@ -123,13 +165,11 @@ def import_history_flow(
     has_ahead_date = "Date" in ahead_df.columns
     needs_timestep = (not has_hist_date) or (not has_ahead_date)
 
-    from scheduling_tabs import _stochastic_controls
-
-    controls = _stochastic_controls(
-        key_prefix="stoch",
-        batteries=sidebar_batteries,
-        show_timestep=needs_timestep,
-        collapse_above=collapse_above,
+    controls = stochastic_controls_renderer(
+        "stoch",
+        sidebar_batteries,
+        needs_timestep,
+        collapse_above,
     )
     if controls is None:
         return None
@@ -191,7 +231,7 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
             fig = make_subplots(
-                rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05
+                rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08
             )
             x = (
                 forecasts_df["Date"]
@@ -200,22 +240,42 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
             )
             if all(c in forecasts_df.columns for c in ["pv", "load"]):
                 fig.add_trace(
-                    go.Scatter(x=x, y=forecasts_df["pv"], name="PV"), row=1, col=1
+                    go.Scatter(
+                        x=x,
+                        y=forecasts_df["pv"],
+                        name="Forecasted PV",
+                        line=dict(color=COLOR_PV),
+                    ),
+                    row=1,
+                    col=1,
                 )
                 fig.add_trace(
-                    go.Scatter(x=x, y=forecasts_df["load"], name="Load"), row=1, col=1
+                    go.Scatter(
+                        x=x,
+                        y=forecasts_df["load"],
+                        name="Forecasted Load",
+                        line=dict(color=COLOR_LOAD),
+                    ),
+                    row=1,
+                    col=1,
                 )
+            fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
             if "import_price" in forecasts_df.columns:
                 fig.add_trace(
                     go.Scatter(
-                        x=x, y=forecasts_df["import_price"], name="Import Price"
+                        x=x,
+                        y=forecasts_df["import_price"],
+                        name="Import Price",
+                        line=dict(color=COLOR_PRICE),
                     ),
                     row=2,
                     col=1,
                 )
-            st.plotly_chart(fig, width='stretch')
+            fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1)
+            fig.update_layout(height=600, margin=dict(t=40, b=20))
+            st.plotly_chart(fig, width="stretch")
         with table_tab:
-            st.dataframe(forecasts_df.head(300), width='stretch', height=260)
+            st.dataframe(forecasts_df.head(300), width="stretch", height=260)
 
 
 def render_history_preview(
@@ -226,45 +286,51 @@ def render_history_preview(
         plot_tab, table_tab = st.tabs(["Plot", "Table"])
         with plot_tab:
             fig = make_subplots(
-                rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05
+                rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08
             )
             xh = hist_df["Date"] if "Date" in hist_df.columns else hist_df.index
             xa = ahead_df["Date"] if "Date" in ahead_df.columns else ahead_df.index
             if all(c in hist_df.columns for c in ["pv", "load"]):
                 fig.add_trace(
                     go.Scatter(
-                        x=xh, y=hist_df["pv"], name="PV (history)"
+                        x=xh,
+                        y=hist_df["pv"],
+                        name="PV (history)",
+                        line=dict(color=COLOR_PV),
                     ),
                     row=1,
                     col=1,
                 )
                 fig.add_trace(
                     go.Scatter(
-                        x=xh, y=hist_df["load"], name="Load (history)"
+                        x=xh,
+                        y=hist_df["load"],
+                        name="Load (history)",
+                        line=dict(color=COLOR_LOAD),
                     ),
                     row=1,
                     col=1,
                 )
+            fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
             if "import_price" in ahead_df.columns:
                 fig.add_trace(
                     go.Scatter(
                         x=xa,
                         y=ahead_df["import_price"],
                         name="Import Price (ahead)",
+                        line=dict(color=COLOR_PRICE),
                     ),
                     row=2,
                     col=1,
                 )
-            st.plotly_chart(fig, width='stretch')
+            fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1)
+            fig.update_layout(height=600, margin=dict(t=40, b=20))
+            st.plotly_chart(fig, width="stretch")
         with table_tab:
             st.write("History (first rows)")
-            st.dataframe(
-                hist_df.head(200), width='stretch', height=200
-            )
+            st.dataframe(hist_df.head(200), width="stretch", height=200)
             st.write("Ahead/tomorrow's prices (first rows)")
-            st.dataframe(
-                ahead_df.head(200), width='stretch', height=200
-            )
+            st.dataframe(ahead_df.head(200), width="stretch", height=200)
 
 
 def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> None:
@@ -272,13 +338,13 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
     with st.expander(
         "Open-source dataset preview (April–December)", expanded=not collapse_above
     ):
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06)
-        fig.add_trace(
-            go.Scatter(x=data_df["Date"], y=data_df["pv"], name="PV"), row=1, col=1
-        )
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08)
         fig.add_trace(
             go.Scatter(
-                x=data_df["Date"], y=data_df["load"], name="Consumption"
+                x=data_df["Date"],
+                y=data_df["pv"],
+                name="PV",
+                line=dict(color=COLOR_PV),
             ),
             row=1,
             col=1,
@@ -286,10 +352,24 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
         fig.add_trace(
             go.Scatter(
                 x=data_df["Date"],
+                y=data_df["load"],
+                name="Consumption",
+                line=dict(color=COLOR_LOAD),
+            ),
+            row=1,
+            col=1,
+        )
+        fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
+        fig.add_trace(
+            go.Scatter(
+                x=data_df["Date"],
                 y=data_df["import_price"],
                 name="Import Price",
+                line=dict(color=COLOR_PRICE),
             ),
             row=2,
             col=1,
         )
-        st.plotly_chart(fig, width='stretch')
+        fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1)
+        fig.update_layout(height=600, margin=dict(t=40, b=20))
+        st.plotly_chart(fig, width="stretch")
