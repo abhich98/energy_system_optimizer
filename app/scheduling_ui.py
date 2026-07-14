@@ -255,6 +255,8 @@ def build_output_panel_chart(
         pv_label: Label for PV trace (e.g., "Forecasted PV", "Expected PV").
         load_label: Label for Load trace (e.g., "Forecasted Load", "Expected Load").
         show_actual: If True, also show actual pv/load from input_df as separate traces.
+
+    # TODO: show_actual and input_df are turning out to be redundant, but keeping them for now in case we want to show actual vs expected in the future.
     """
     # Detect battery IDs from output columns
     battery_ids: list[str] = []
@@ -282,14 +284,8 @@ def build_output_panel_chart(
         specs=specs,
     )
 
-    input_x = (
-        input_df["Date"]
-        if "Date" in input_df.columns
-        else (
-            input_df["timestep"] if "timestep" in input_df.columns else input_df.index
-        )
-    )
-    output_x = output_df["Date"] if "Date" in output_df.columns else output_df.index
+    input_x = input_df.index
+    output_x = output_df.index
 
     # Row 1: PV and Load
     pv_col_out = (
@@ -371,7 +367,9 @@ def build_output_panel_chart(
                 row=2,
                 col=1,
             )
-    fig.update_yaxes(title_text="Price (EUR/kWh)", row=2, col=1, autorange=True)
+    fig.update_yaxes(
+        title_text="Electricity Price (EUR/kWh)", row=2, col=1, autorange=True
+    )
 
     # Rows 3+: Per-battery charge/discharge + SOC
     battery_capacities: dict[str, float] = {}
@@ -390,7 +388,7 @@ def build_output_panel_chart(
             fig.add_trace(
                 go.Scatter(
                     x=output_x,
-                    y=output_df[charge_col],
+                    y=output_df[charge_col].round(4),
                     mode="lines",
                     name=f"{bid} Charge",
                     line=dict(color=COLOR_CHARGE),
@@ -403,7 +401,7 @@ def build_output_panel_chart(
             fig.add_trace(
                 go.Scatter(
                     x=output_x,
-                    y=output_df[discharge_col],
+                    y=output_df[discharge_col].round(4),
                     mode="lines",
                     name=f"{bid} Discharge",
                     line=dict(color=COLOR_DISCHARGE),
@@ -462,7 +460,7 @@ def build_output_panel_chart(
         margin=dict(t=60, b=20, r=40),
     )
     fig.update_xaxes(
-        title_text="Date" if "Date" in output_df.columns else "timestep",
+        title_text="Date",
         row=n_rows,
         col=1,
     )

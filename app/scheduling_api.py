@@ -7,7 +7,6 @@ import requests
 from scheduling_config import API_BASE, DETERM_ENDPOINT, STOCH_ENDPOINT
 
 from household_battery.api.models import (
-    ChampionPolicy,
     DeterministicRequest,
     StochasticRequest,
 )
@@ -39,7 +38,7 @@ def get_available_solvers() -> list[str]:
 
 def is_champion_healthy() -> bool:
     try:
-        response = requests.get(f"{API_BASE}/health", timeout=15)
+        response = requests.get(f"{API_BASE}/health", timeout=120)
         return response.json().get("champion_policy", {}).get("exists", False)
     except Exception:
         return False
@@ -52,7 +51,7 @@ def call_deterministic_api(
 ) -> pd.DataFrame:
     request_model = DeterministicRequest(
         batteries=batteries,
-        forecasts_csv=forecasts_df.to_csv(index=False),
+        forecasts_csv=forecasts_df.to_csv(),
         timestep_hours=timestep_hours,
     )
     payload = request_model.model_dump(exclude_none=True)
@@ -75,8 +74,8 @@ def call_stochastic_api(
 ) -> pd.DataFrame:
     request_model = StochasticRequest(
         batteries=batteries,
-        history_csv=history_df.to_csv(index=False),
-        ahead_prices_csv=ahead_df.to_csv(index=False),
+        history_csv=history_df.to_csv(),
+        ahead_prices_csv=ahead_df.to_csv(),
         policy_override=policy_override,
         timestep_hours=timestep_hours,
     )
