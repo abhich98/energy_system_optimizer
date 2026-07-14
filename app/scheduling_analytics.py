@@ -234,10 +234,10 @@ def _render_price_duration_plot(
             )
         )
     fig.update_layout(
-        title="Price-Duration with Charge/Discharge Markers",
+        title="Price-Duration Plot with Charge/Discharge Markers",
         margin=dict(t=40, b=20),
         xaxis_title="Rank (sorted by price)",
-        yaxis_title="Import Price (EUR/kWh)",
+        yaxis_title="Electricity Price (EUR/kWh)",
     )
     return fig
 
@@ -467,28 +467,43 @@ def render_comparative_analytics(
 
     x_axis = det_output["Date"] if "Date" in det_output.columns else det_output.index
 
+    metric_heading_color = "#e8e9eb"
+    metric_value_color = "#f8fafc"
+    metric_positive_delta_color = "#34d399"  # green for positive delta
+    metric_negative_delta_color = "#fb7185"  # red for negative delta
+    metric_border_color = "#f59e0b"
+
     # Row 1: Cost KPIs — perfect foresight, stochastic, baseline
     k1, k2, k3 = st.columns(3)
-    k1.metric(
-        "Total Cost (Baseline / PF / Stoch)",
-        f"€{pf_metrics['baseline_cost']:.2f}/€{pf_metrics['scheduled_cost']:.2f}/€{stoch_metrics['scheduled_cost']:.2f}",
-        help="Baseline: no battery, PF: perfect foresight schedule, Stoch: stochastic schedule evaluated with actual PV/load",
-    )
-    st.markdown(
-        '<style>div[data-testid="stMetric"]:not(:first-child) [data-testid="stMetricValue"]{font-size:1.1rem!important}div[data-testid="stMetric"]:not(:first-child) [data-testid="stMetricLabel"]{font-size:0.85rem!important}</style>',
-        unsafe_allow_html=True,
-    )
-    k2.metric(
-        "Savings vs Baseline (PF)",
-        f"€{pf_metrics['savings']:.2f}",
-        f"{pf_metrics['savings_pct']:.1f}%",
-    )
-    k3.metric(
-        "Savings vs Baseline (Stoch)",
-        f"€{stoch_metrics['savings']:.2f}",
-        f"{stoch_metrics['savings_pct']:.1f}%",
-        help="Savings for stochastic schedule are computed by evaluating the stochastic schedule with actual PV/load data. This could be negative at a day level, but overall savings should be positive over an extended period.",
-    )
+    with k1:
+        st.metric(
+            "Total Cost (Baseline / PF / Stoch)",
+            f"€{pf_metrics['baseline_cost']:.2f} / €{pf_metrics['scheduled_cost']:.2f} / €{stoch_metrics['scheduled_cost']:.2f}",
+            help="Baseline: no battery, PF: perfect foresight schedule, Stoch: history based stochastic schedule evaluated with actual PV/load",
+        )
+    with k2:
+        delta_color = metric_positive_delta_color if pf_metrics["savings"] >= 0 else metric_negative_delta_color
+        st.markdown(
+            f'<div style="border-left:3px solid {delta_color};padding-left:10px">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Savings vs Baseline (PF)</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">€{pf_metrics["savings"]:.2f} '
+            f'<span style="font-size:1.1rem;color:{delta_color}">({pf_metrics["savings_pct"]:.1f}%)</span></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    with k3:
+        delta_color = metric_positive_delta_color if stoch_metrics["savings"] >= 0 else metric_negative_delta_color
+        st.markdown(
+            f'<div style="border-left:3px solid {delta_color};padding-left:10px" '
+            f'title="Savings for stochastic schedule are computed by evaluating the stochastic schedule with actual PV/load data. '
+            f'This could be negative (i.e., costlier than having no battery) on certain days when the actual data from the day deviates significantly from the immediate history.">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Savings vs Baseline (Stoch)</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">€{stoch_metrics["savings"]:.2f} '
+            f'<span style="font-size:1.1rem;color:{delta_color}">({stoch_metrics["savings_pct"]:.1f}%)</span></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
     # k4.metric(
     #     "Peak Import Reduction (PF)",
     #     f"{pf_metrics['peak_reduction']:.2f} kW",
@@ -499,23 +514,40 @@ def render_comparative_analytics(
     st.markdown("##### Battery and other KPIs")
     k5, k6 = st.columns([1, 2])
     with k5:
-        st.metric("Battery Throughput (PF / Stoch)", f"{pf_metrics['throughput']:.2f} / {stoch_metrics['throughput']:.2f} kWh")
-        st.metric("Battery Degradation Cost (PF / Stoch)", f"€{pf_metrics['costs'].degradation_cost:.2f} / €{stoch_metrics['costs'].degradation_cost:.2f}")
-        st.metric(
-            "PV Self-Consumption (PF / Stoch)",
-            f"{pf_metrics['self_consumption_pct']:.1f}% / {stoch_metrics['self_consumption_pct']:.1f}%",
-            help="Self-consumption is the percentage of PV generation that is consumed on-site (not exported to the grid).",
+        st.markdown(
+            f'<div style="border-left:3px solid {metric_border_color};padding-left:10px;margin-bottom:8px">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Battery Throughput (PF / Stoch)</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">{pf_metrics["throughput"]:.2f} / {stoch_metrics["throughput"]:.2f} kWh</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.space()
+        st.markdown(
+            f'<div style="border-left:3px solid {metric_border_color};padding-left:10px;margin-bottom:8px">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Battery Degradation Cost (PF / Stoch)</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">€{pf_metrics["costs"].degradation_cost:.2f} / €{stoch_metrics["costs"].degradation_cost:.2f}</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        st.space()
+        st.markdown(
+            f'<div style="border-left:3px solid {metric_border_color};padding-left:10px" '
+            f'title="Self-consumption is the percentage of PV generation that is consumed on-site (not exported to the grid).">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">PV Self-Consumption (PF / Stoch)</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">{pf_metrics["self_consumption_pct"]:.1f}% / {stoch_metrics["self_consumption_pct"]:.1f}%</div>'
+            f'</div>',
+            unsafe_allow_html=True,
         )
     with k6:
-        st.caption(
-            "Price-duration curve: import prices sorted from lowest to highest. "
-            "▲ markers show timesteps where the battery charges (low prices), "
-            "▼ markers show timesteps where it discharges (high prices)."
-        )
         fig_pd = _render_price_duration_plot(
             stoch_metrics, stoch_metrics["charge_total"], stoch_metrics["discharge_total"]
         )
         st.plotly_chart(fig_pd, width="stretch")
+        # st.info(
+        #     "Price-duration curve: import prices sorted from lowest to highest. "
+        #     "▲ markers show timesteps where the battery charges (low prices), "
+        #     "▼ markers show timesteps where it discharges (high prices)."
+        # )
 
     # Row 3: Grid import + cumulative cost (baseline + both schedules)
     st.markdown("##### Grid Import and Cumulative Cost")

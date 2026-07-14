@@ -539,7 +539,7 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     #     stoch_output, batteries, key_suffix="open_stoch"
                     # )
                     out_pf_plot, out_stoch_plot, out_analytics, out_table = st.tabs(
-                        ["Perfect Foresight Plots", "Stochastic Plots (based on history)", "Analytics", "Table"]
+                        ["Perfect Forecasts/Foresight - Plots", "Scheduling based on history (stochastic) - Plots", "Analytics", "Table"]
                     )
                     with out_pf_plot:
                         chart_pf = build_output_panel_chart(
