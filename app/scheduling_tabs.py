@@ -234,7 +234,9 @@ def _require_champion_health(key_prefix: str) -> bool:
     with button_col:
         check_now = st.button("Check health", key=f"{key_prefix}_check_champion_health")
         if check_now:
-            with st.spinner("Checking champion policy on server, could take a few minutes..."):
+            with st.spinner(
+                "Checking champion policy on server, could take a few minutes..."
+            ):
                 st.session_state[ready_key] = is_champion_healthy()
 
     champion_ready = st.session_state[ready_key]
@@ -427,12 +429,11 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                 return
 
             display_df = data_df[
-                data_df["Date"].dt.month.between(
-                    OPEN_SOURCE_START_MONTH, OPEN_SOURCE_END_MONTH
-                )
+                (data_df.index.month >= OPEN_SOURCE_START_MONTH)
+                & (data_df.index.month <= OPEN_SOURCE_END_MONTH)
             ]
 
-            available_days = sorted(display_df["Date"].dt.date.unique())
+            available_days = display_df.index.normalize().unique().sort_values()
             render_open_source_overview(
                 data_df=display_df,
                 collapse_above=st.session_state.get("open_source_selected_day")
@@ -478,11 +479,11 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
             # Trim history data to the determined number of days before the selected day
             history_start = day_start - pd.Timedelta(days=history_days)
             history_df = data_df[
-                (data_df["Date"] >= history_start) & (data_df["Date"] < day_start)
-            ][["Date"] + HIST_REQUIRED_COLS + AHEAD_REQUIRED_COLS].copy()
+                (data_df.index >= history_start) & (data_df.index < day_start)
+            ][HIST_REQUIRED_COLS + AHEAD_REQUIRED_COLS].copy()
             ahead_df = data_df[
-                (data_df["Date"] >= day_start) & (data_df["Date"] < day_end)
-            ][["Date"] + HIST_REQUIRED_COLS + AHEAD_REQUIRED_COLS].copy()
+                (data_df.index >= day_start) & (data_df.index < day_end)
+            ][HIST_REQUIRED_COLS + AHEAD_REQUIRED_COLS].copy()
 
             if ahead_df.empty:
                 st.error(
@@ -539,7 +540,12 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                     #     stoch_output, batteries, key_suffix="open_stoch"
                     # )
                     out_pf_plot, out_stoch_plot, out_analytics, out_table = st.tabs(
-                        ["Perfect Forecasts/Foresight - Plots", "Scheduling based on history (stochastic) - Plots", "Analytics", "Table"]
+                        [
+                            "Perfect Forecasts/Foresight - Plots",
+                            "Scheduling based on history (stochastic) - Plots",
+                            "Analytics",
+                            "Table",
+                        ]
                     )
                     with out_pf_plot:
                         chart_pf = build_output_panel_chart(
@@ -552,12 +558,12 @@ def render_scheduling_tabs(sidebar_batteries: Optional[list[dict]]) -> None:
                         st.plotly_chart(chart_pf, width="stretch")
                     with out_stoch_plot:
                         chart_stoch = build_output_panel_chart(
-                                ahead_df.copy(),
-                                stoch_output,
-                                batteries=batteries,
-                                pv_label="Expected PV (from history)",
-                                load_label="Expected Load (from history)",
-                            )
+                            ahead_df.copy(),
+                            stoch_output,
+                            batteries=batteries,
+                            pv_label="Expected PV (from history)",
+                            load_label="Expected Load (from history)",
+                        )
                         st.plotly_chart(chart_stoch, width="stretch")
 
                     with out_analytics:

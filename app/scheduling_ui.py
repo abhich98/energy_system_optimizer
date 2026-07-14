@@ -284,8 +284,8 @@ def build_output_panel_chart(
         specs=specs,
     )
 
-    input_x = input_df["Date"] if "Date" in input_df.columns else input_df.index
-    output_x = output_df["Date"] if "Date" in output_df.columns else output_df.index
+    input_x = input_df.index
+    output_x = output_df.index
 
     # Row 1: PV and Load
     pv_col_out = (
@@ -460,7 +460,7 @@ def build_output_panel_chart(
         margin=dict(t=60, b=20, r=40),
     )
     fig.update_xaxes(
-        title_text="Date" if "Date" in output_df.columns else "timestep",
+        title_text="Date",
         row=n_rows,
         col=1,
     )

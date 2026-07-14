@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Callable, Optional, Tuple
 
-from matplotlib.pyplot import plot
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -98,6 +97,9 @@ def import_forecasts_flow(
         forecasts_df["Date"] = pd.date_range(
             start=tomo, periods=len(forecasts_df), freq=f"{opts['timestep_hours']}h"
         )
+
+    forecasts_df.sort_values("Date", inplace=True)
+    forecasts_df.set_index("Date", inplace=True)
 
     if sidebar_batteries is None or opts is None:
         st.info("Fix validation errors above to continue.")
@@ -201,6 +203,11 @@ def import_history_flow(
             (hist_df["Date"] >= history_start) & (hist_df["Date"] < day_ahead)
         ].copy()
 
+    hist_df.sort_values("Date", inplace=True)
+    ahead_df.sort_values("Date", inplace=True)
+    hist_df.set_index("Date", inplace=True)
+    ahead_df.set_index("Date", inplace=True)
+
     return hist_df, ahead_df, batteries, opts, override
 
 
@@ -226,7 +233,8 @@ def load_open_source_dataset() -> pd.DataFrame:
     data_df.dropna(subset=["Date", "pv", "load", "import_price"], inplace=True)
 
     data_df.sort_values("Date", inplace=True)
-    data_df.reset_index(drop=True, inplace=True)
+    data_df.set_index("Date", inplace=True)
+    # data_df.reset_index(drop=True, inplace=True)
     return data_df
 
 
@@ -238,11 +246,8 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
             fig = make_subplots(
                 rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08
             )
-            x = (
-                forecasts_df["Date"]
-                if "Date" in forecasts_df.columns
-                else forecasts_df.index
-            )
+            x = forecasts_df.index
+
             if all(c in forecasts_df.columns for c in ["pv", "load"]):
                 fig.add_trace(
                     go.Scatter(
@@ -265,6 +270,7 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
                     col=1,
                 )
             fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
+
             if "import_price" in forecasts_df.columns:
                 fig.add_trace(
                     go.Scatter(
@@ -279,6 +285,7 @@ def render_forecast_preview(forecasts_df: pd.DataFrame, collapse_above: bool) ->
             fig.update_yaxes(title_text="Electricity Price (EUR/kWh)", row=2, col=1)
             fig.update_layout(height=600, margin=dict(t=40, b=20))
             st.plotly_chart(fig, width="stretch")
+
         with table_tab:
             st.dataframe(forecasts_df.head(300), width="stretch", height=260)
 
@@ -300,8 +307,8 @@ def render_history_preview(
             fig = make_subplots(
                 rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08
             )
-            xh = hist_df["Date"] if "Date" in hist_df.columns else hist_df.index
-            xa = ahead_df["Date"] if "Date" in ahead_df.columns else ahead_df.index
+            xh = hist_df.index
+            xa = ahead_df.index
 
             # History traces: dotted lines
             if all(c in hist_df.columns for c in ["pv", "load"]):
@@ -381,8 +388,8 @@ def render_history_preview(
             fig.update_yaxes(title_text="Electricity Price (EUR/kWh)", row=2, col=1)
 
             # Add boundary line + annotations if both have Date columns
-            if "Date" in hist_df.columns and "Date" in ahead_df.columns:
-                boundary = ahead_df["Date"].min()
+            if hist_df.index.name == "Date" and ahead_df.index.name == "Date":
+                boundary = ahead_df.index.min()
                 for row in [1, 2]:
                     fig.add_vline(
                         x=boundary,
@@ -431,7 +438,7 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08)
         fig.add_trace(
             go.Scatter(
-                x=data_df["Date"],
+                x=data_df.index,
                 y=data_df["pv"],
                 name="PV",
                 line=dict(color=COLOR_PV),
@@ -441,7 +448,7 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
         )
         fig.add_trace(
             go.Scatter(
-                x=data_df["Date"],
+                x=data_df.index,
                 y=data_df["load"],
                 name="Load/Consumption",
                 line=dict(color=COLOR_LOAD),
@@ -452,7 +459,7 @@ def render_open_source_overview(data_df: pd.DataFrame, collapse_above: bool) -> 
         fig.update_yaxes(title_text="Power (kW)", row=1, col=1)
         fig.add_trace(
             go.Scatter(
-                x=data_df["Date"],
+                x=data_df.index,
                 y=data_df["import_price"],
                 name="Import Price",
                 line=dict(color=COLOR_PRICE),

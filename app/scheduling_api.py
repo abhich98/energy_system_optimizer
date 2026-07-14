@@ -51,7 +51,7 @@ def call_deterministic_api(
 ) -> pd.DataFrame:
     request_model = DeterministicRequest(
         batteries=batteries,
-        forecasts_csv=forecasts_df.to_csv(index=False),
+        forecasts_csv=forecasts_df.to_csv(),
         timestep_hours=timestep_hours,
     )
     payload = request_model.model_dump(exclude_none=True)
@@ -74,8 +74,8 @@ def call_stochastic_api(
 ) -> pd.DataFrame:
     request_model = StochasticRequest(
         batteries=batteries,
-        history_csv=history_df.to_csv(index=False),
-        ahead_prices_csv=ahead_df.to_csv(index=False),
+        history_csv=history_df.to_csv(),
+        ahead_prices_csv=ahead_df.to_csv(),
         policy_override=policy_override,
         timestep_hours=timestep_hours,
     )

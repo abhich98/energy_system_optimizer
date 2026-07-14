@@ -2,10 +2,8 @@ from __future__ import annotations
 
 import threading
 
-import requests
 from scheduling_api import is_champion_healthy
 import streamlit as st
-from scheduling_config import API_BASE
 from scheduling_tabs import render_scheduling_tabs
 from scheduling_ui import apply_theme_and_header, battery_editor
 
@@ -43,7 +41,9 @@ def main() -> None:
     sidebar_batteries = _render_sidebar_batteries()
     _render_instructions()
 
-    st.markdown("**Try one of the two approaches or explore open-source data:**")
+    st.markdown(
+        "**Edit the battery configuration in the left sidebar. Try one of the two approaches or explore open-source data:**"
+    )
 
     # Future extension point:
     # Add top-level home routing here (e.g., Open-source exploration page vs Scheduling page).

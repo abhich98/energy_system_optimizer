@@ -27,16 +27,26 @@ def first_present(df: pd.DataFrame, candidates: list[str]) -> Optional[str]:
 
 def resolve_timestep_hours(df: pd.DataFrame, fallback: Optional[float]) -> float:
     """Infer timestep in hours from Date column or use fallback."""
+
     if "Date" in df.columns:
         date_series = pd.to_datetime(df["Date"], errors="coerce")
-        diffs = date_series.diff().dt.total_seconds().dropna()
-        if not diffs.empty:
-            median_hours = float(diffs.median() / 3600.0)
-            if median_hours > 0:
-                return median_hours
-    if fallback and fallback > 0:
+    elif df.index.name == "Date":
+        date_series = pd.to_datetime(pd.Series(df.index), errors="coerce")
+    elif fallback and fallback > 0:
         return float(fallback)
-    return 1.0
+    else:
+        raise ValueError(
+            "Cannot resolve timestep_hours: no Date column and no valid fallback"
+        )
+
+    diffs = date_series.diff().dt.total_seconds().dropna()
+    median_hours = float(diffs.median() / 3600.0)
+    if median_hours > 0:
+        return median_hours
+    else:
+        raise ValueError(
+            "Cannot resolve timestep_hours: Date column has non-positive differences"
+        )
 
 
 def total_battery_flows(
@@ -140,7 +150,9 @@ def _compute_schedule_metrics(
     for bat in batteries:
         charge_series = output_df[f"{bat['id']}_charge"]
         discharge_series = output_df[f"{bat['id']}_discharge"]
-        scheduled_cost_series += charge_series * bat["degradation_cost"] * timestep_hours
+        scheduled_cost_series += (
+            charge_series * bat["degradation_cost"] * timestep_hours
+        )
         scheduled_cost_series += (
             discharge_series * bat["degradation_cost"] * timestep_hours
         )
@@ -230,7 +242,9 @@ def _render_price_duration_plot(
                 y=discharge_pts["price"],
                 name="Discharge",
                 mode="markers",
-                marker=dict(symbol="triangle-down", size=8, color=CHART_COLORS["discharge"]),
+                marker=dict(
+                    symbol="triangle-down", size=8, color=CHART_COLORS["discharge"]
+                ),
             )
         )
     fig.update_layout(
@@ -256,9 +270,7 @@ def _render_grid_and_cumulative_plot(
     """
     from plotly.subplots import make_subplots
 
-    fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08
-    )
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08)
 
     # Row 1: Grid import
     fig.add_trace(
@@ -313,7 +325,11 @@ def _render_grid_and_cumulative_plot(
         go.Scatter(
             x=x_axis,
             y=metrics["scheduled_cost_series"].cumsum(),
-            name="Scheduled Cumulative Cost" if label is None else f"{label} Cumulative Cost",
+            name=(
+                "Scheduled Cumulative Cost"
+                if label is None
+                else f"{label} Cumulative Cost"
+            ),
             mode="lines",
             line=dict(color=CHART_COLORS["load"]),
         ),
@@ -345,8 +361,8 @@ def render_schedule_analytics(
 ) -> None:
     """Render 3-row analytics for a single schedule result.
 
-    Row 1: Cost KPIs (scheduled cost, savings, peak reduction, self-consumption)
-    Row 2: Battery KPIs (throughput, degradation) + price-duration plot
+    Row 1: Cost KPIs (total cost + savings vs baseline)
+    Row 2: Battery KPIs (left, stacked) + price-duration plot (right)
     Row 3: Grid import + cumulative cost (two subplots)
     """
     load_col = first_present(output_df, ["load", "expected_load"])
@@ -362,34 +378,72 @@ def render_schedule_analytics(
     timestep_hours = resolve_timestep_hours(output_df, timestep_hours_hint)
     metrics = _compute_schedule_metrics(output_df, batteries, timestep_hours)
 
-    x_axis = output_df["Date"] if "Date" in output_df.columns else output_df.index
+    x_axis = output_df.index
 
-    # Row 1: Cost KPIs
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Scheduled Cost", f"€{metrics['scheduled_cost']:.2f}")
-    k2.metric(
-        "Savings vs Baseline",
-        f"€{metrics['savings']:.2f}",
-        f"{metrics['savings_pct']:.1f}%",
-    )
-    k3.metric(
-        "Peak Import Reduction",
-        f"{metrics['peak_reduction']:.2f} kW",
-        f"{metrics['peak_reduction_pct']:.1f}%",
-    )
-    k4.metric("Self-Consumption", f"{metrics['self_consumption_pct']:.1f}%")
+    metric_heading_color = "#e8e9eb"
+    metric_border_color = "#f59e0b"
+    metric_positive_delta_color = "#34d399"
+    metric_negative_delta_color = "#fb7185"
 
-    # Row 2: Battery KPIs + price-duration plot
-    k5, k6, k7 = st.columns([1, 1, 2])
-    k5.metric("Battery Throughput", f"{metrics['throughput']:.2f} kWh")
-    k6.metric("Battery Degradation Cost", f"€{metrics['costs'].degradation_cost:.2f}")
-    with k7:
+    # Row 1: Cost KPIs — total cost (big) + savings (styled HTML)
+    k1, k2 = st.columns(2)
+    with k1:
+        st.metric(
+            "Total Cost (Baseline / Scheduled)",
+            f"€{metrics['baseline_cost']:.2f} / €{metrics['scheduled_cost']:.2f}",
+            help="Baseline: no battery, Scheduled: using battery schedule optimized either with provided forecasts or history data",
+        )
+    with k2:
+        delta_color = (
+            metric_positive_delta_color
+            if metrics["savings"] >= 0
+            else metric_negative_delta_color
+        )
+        st.markdown(
+            f'<div style="border-left:3px solid {delta_color};padding-left:10px">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Savings vs Baseline</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">€{metrics["savings"]:.2f} '
+            f'<span style="font-size:1.1rem;color:{delta_color}">({metrics["savings_pct"]:.1f}%)</span></div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Row 2: Battery KPIs (left, stacked) + price-duration plot (right)
+    st.markdown("##### Battery and other KPIs")
+    k3, k4 = st.columns([1, 2])
+    with k3:
+        st.markdown(
+            f'<div style="border-left:3px solid {metric_border_color};padding-left:10px;margin-bottom:8px">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Battery Throughput</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">{metrics["throughput"]:.2f} kWh</div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        st.space()
+        st.markdown(
+            f'<div style="border-left:3px solid {metric_border_color};padding-left:10px;margin-bottom:8px">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">Battery Degradation Cost</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">€{metrics["costs"].degradation_cost:.2f}</div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        st.space()
+        st.markdown(
+            f'<div style="border-left:3px solid {metric_border_color};padding-left:10px" '
+            f'title="Self-consumption is the percentage of PV generation that is consumed on-site (not exported to the grid).">'
+            f'<div style="font-size:0.8rem;color:{metric_heading_color}">PV Self-Consumption</div>'
+            f'<div style="font-size:1.5rem;font-weight:bold">{metrics["self_consumption_pct"]:.1f}%</div>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with k4:
         fig_pd = _render_price_duration_plot(
             metrics, metrics["charge_total"], metrics["discharge_total"]
         )
         st.plotly_chart(fig_pd, width="stretch")
 
     # Row 3: Grid import + cumulative cost
+    st.markdown("##### Grid Import and Cumulative Cost")
     fig_grid_cum = _render_grid_and_cumulative_plot(metrics, x_axis)
     st.plotly_chart(fig_grid_cum, width="stretch")
 
@@ -412,10 +466,7 @@ def _recompute_grid_flows_with_actual(
     so that downstream calculators find them consistently.
     """
     eval_df = stoch_output.copy()
-    if "Date" not in eval_df.columns and eval_df.index.name == "Date":
-        eval_df = eval_df.reset_index()
     eval_df = eval_df.reset_index(drop=True)
-    actual_df = actual_df.reset_index(drop=True)
 
     # Strip expected_ prefix so all columns use consistent names
     eval_df.rename(
@@ -425,7 +476,9 @@ def _recompute_grid_flows_with_actual(
 
     # Replace PV/load with actual values
     eval_df["pv"] = pd.to_numeric(actual_df["pv"], errors="coerce").fillna(0.0).values
-    eval_df["load"] = pd.to_numeric(actual_df["load"], errors="coerce").fillna(0.0).values
+    eval_df["load"] = (
+        pd.to_numeric(actual_df["load"], errors="coerce").fillna(0.0).values
+    )
 
     # Recompute grid flows from actual PV/load + battery schedule
     charge_total, discharge_total = total_battery_flows(eval_df, batteries)
@@ -461,14 +514,11 @@ def render_comparative_analytics(
     stoch_eval_df = _recompute_grid_flows_with_actual(
         stoch_output, actual_df, batteries
     )
-    stoch_metrics = _compute_schedule_metrics(
-        stoch_eval_df, batteries, timestep_hours
-    )
+    stoch_metrics = _compute_schedule_metrics(stoch_eval_df, batteries, timestep_hours)
 
-    x_axis = det_output["Date"] if "Date" in det_output.columns else det_output.index
+    x_axis = det_output.index
 
     metric_heading_color = "#e8e9eb"
-    metric_value_color = "#f8fafc"
     metric_positive_delta_color = "#34d399"  # green for positive delta
     metric_negative_delta_color = "#fb7185"  # red for negative delta
     metric_border_color = "#f59e0b"
@@ -479,20 +529,28 @@ def render_comparative_analytics(
         st.metric(
             "Total Cost (Baseline / PF / Stoch)",
             f"€{pf_metrics['baseline_cost']:.2f} / €{pf_metrics['scheduled_cost']:.2f} / €{stoch_metrics['scheduled_cost']:.2f}",
-            help="Baseline: no battery, PF: perfect foresight schedule, Stoch: history based stochastic schedule evaluated with actual PV/load",
+            help="Baseline: no battery | PF: using battery schedule optimized with perfect foresight | Stoch: using battery schedule optimized based on history (stochastic) evaluated with actual PV/load",
         )
     with k2:
-        delta_color = metric_positive_delta_color if pf_metrics["savings"] >= 0 else metric_negative_delta_color
+        delta_color = (
+            metric_positive_delta_color
+            if pf_metrics["savings"] >= 0
+            else metric_negative_delta_color
+        )
         st.markdown(
             f'<div style="border-left:3px solid {delta_color};padding-left:10px">'
             f'<div style="font-size:0.8rem;color:{metric_heading_color}">Savings vs Baseline (PF)</div>'
             f'<div style="font-size:1.5rem;font-weight:bold">€{pf_metrics["savings"]:.2f} '
             f'<span style="font-size:1.1rem;color:{delta_color}">({pf_metrics["savings_pct"]:.1f}%)</span></div>'
-            f'</div>',
+            f"</div>",
             unsafe_allow_html=True,
         )
     with k3:
-        delta_color = metric_positive_delta_color if stoch_metrics["savings"] >= 0 else metric_negative_delta_color
+        delta_color = (
+            metric_positive_delta_color
+            if stoch_metrics["savings"] >= 0
+            else metric_negative_delta_color
+        )
         st.markdown(
             f'<div style="border-left:3px solid {delta_color};padding-left:10px" '
             f'title="Savings for stochastic schedule are computed by evaluating the stochastic schedule with actual PV/load data. '
@@ -500,7 +558,7 @@ def render_comparative_analytics(
             f'<div style="font-size:0.8rem;color:{metric_heading_color}">Savings vs Baseline (Stoch)</div>'
             f'<div style="font-size:1.5rem;font-weight:bold">€{stoch_metrics["savings"]:.2f} '
             f'<span style="font-size:1.1rem;color:{delta_color}">({stoch_metrics["savings_pct"]:.1f}%)</span></div>'
-            f'</div>',
+            f"</div>",
             unsafe_allow_html=True,
         )
 
@@ -518,7 +576,7 @@ def render_comparative_analytics(
             f'<div style="border-left:3px solid {metric_border_color};padding-left:10px;margin-bottom:8px">'
             f'<div style="font-size:0.8rem;color:{metric_heading_color}">Battery Throughput (PF / Stoch)</div>'
             f'<div style="font-size:1.5rem;font-weight:bold">{pf_metrics["throughput"]:.2f} / {stoch_metrics["throughput"]:.2f} kWh</div>'
-            f'</div>',
+            f"</div>",
             unsafe_allow_html=True,
         )
         st.space()
@@ -526,7 +584,7 @@ def render_comparative_analytics(
             f'<div style="border-left:3px solid {metric_border_color};padding-left:10px;margin-bottom:8px">'
             f'<div style="font-size:0.8rem;color:{metric_heading_color}">Battery Degradation Cost (PF / Stoch)</div>'
             f'<div style="font-size:1.5rem;font-weight:bold">€{pf_metrics["costs"].degradation_cost:.2f} / €{stoch_metrics["costs"].degradation_cost:.2f}</div>'
-            f'</div>',
+            f"</div>",
             unsafe_allow_html=True,
         )
         st.space()
@@ -535,12 +593,14 @@ def render_comparative_analytics(
             f'title="Self-consumption is the percentage of PV generation that is consumed on-site (not exported to the grid).">'
             f'<div style="font-size:0.8rem;color:{metric_heading_color}">PV Self-Consumption (PF / Stoch)</div>'
             f'<div style="font-size:1.5rem;font-weight:bold">{pf_metrics["self_consumption_pct"]:.1f}% / {stoch_metrics["self_consumption_pct"]:.1f}%</div>'
-            f'</div>',
+            f"</div>",
             unsafe_allow_html=True,
         )
     with k6:
         fig_pd = _render_price_duration_plot(
-            stoch_metrics, stoch_metrics["charge_total"], stoch_metrics["discharge_total"]
+            stoch_metrics,
+            stoch_metrics["charge_total"],
+            stoch_metrics["discharge_total"],
         )
         st.plotly_chart(fig_pd, width="stretch")
         # st.info(
